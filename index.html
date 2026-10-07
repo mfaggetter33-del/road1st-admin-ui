@@ -274,6 +274,58 @@ tr:last-child td{border-bottom:0}
 .timeline-detail{font-size:13px;line-height:1.4}
 .viewer-empty{color:var(--muted);padding:6px 0}
 .viewer-loading{padding:35px 20px;color:var(--muted);text-align:center}
+
+.image-preview-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:1100;
+  background:rgba(3,6,10,.9);
+  backdrop-filter:blur(6px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.image-preview-card{
+  width:min(1100px,96vw);
+  max-height:92vh;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:22px;
+  box-shadow:0 30px 90px rgba(0,0,0,.7);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.image-preview-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
+  padding:16px 18px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+}
+.image-preview-head h2{margin:0;font-size:21px}
+.image-preview-actions{display:flex;gap:8px;flex-wrap:wrap}
+.image-preview-body{
+  min-height:260px;
+  padding:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:auto;
+  background:#070a0f;
+}
+.image-preview-body img{
+  max-width:100%;
+  max-height:72vh;
+  object-fit:contain;
+  border-radius:12px;
+  border:1px solid var(--border);
+  box-shadow:0 12px 35px rgba(0,0,0,.4);
+}
+.image-preview-loading{color:var(--muted);padding:38px}
 @media(max-width:720px){
   .wrap{padding:14px 12px 38px}
   .brand-shell{align-items:flex-start;flex-direction:column}
@@ -324,11 +376,24 @@ tr:last-child td{border-bottom:0}
     <div id="viewerContent" class="viewer-body"></div>
   </div>
 </div>
+
+<div id="imagePreview" class="image-preview-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle">
+  <div class="image-preview-card">
+    <div class="image-preview-head">
+      <div><h2 id="imagePreviewTitle">ROAD 1ST Image</h2><div id="imagePreviewMeta" class="sub"></div></div>
+      <div class="image-preview-actions">
+        <button id="imagePreviewDownload" class="teal">Download</button>
+        <button id="imagePreviewClose" class="secondary">Close</button>
+      </div>
+    </div>
+    <div id="imagePreviewBody" class="image-preview-body"><div class="image-preview-loading">Loading image…</div></div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
 (function(){"use strict";
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",A=P+"/functions/v1/road1st-admin-api",S=null,C="reports",CURRENT_REPORT=null,CURRENT_REPORT_FILE="";
-var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf");
+var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
 function clear(){S=null;sessionStorage.removeItem("r1a")}
@@ -421,11 +486,35 @@ var controls=r.controls||{},keys=Object.keys(controls).filter(function(k){return
 var issues=section("Warnings / errors");if(r.issues&&r.issues.length){r.issues.forEach(function(x){var row=document.createElement("div");row.className="viewer-row";var a=document.createElement("span"),b=document.createElement("strong");a.textContent=date(x.utc);b.textContent=eventName(x.event)+": "+x.detail;b.className="viewer-warn";row.appendChild(a);row.appendChild(b);issues.appendChild(row)})}else{var ok=document.createElement("div");ok.className="viewer-empty viewer-ok";ok.textContent="No recorded failures or GPS-disable events.";issues.appendChild(ok)}
 var ts=section("Event timeline"),list=document.createElement("div");list.className="timeline";(r.timeline||[]).forEach(function(x){var item=document.createElement("div"),t=document.createElement("div"),e=document.createElement("div"),dd=document.createElement("div");item.className="timeline-item";t.className="timeline-time";e.className="timeline-event";dd.className="timeline-detail";t.textContent=date(x.utc);e.textContent=eventName(x.event);dd.textContent=eventDetail(x);item.appendChild(t);item.appendChild(e);item.appendChild(dd);list.appendChild(item)});if(!(r.timeline||[]).length){var empty=document.createElement("div");empty.className="viewer-empty";empty.textContent="No timeline events available.";list.appendChild(empty)}ts.appendChild(list)}
 function viewBtn(tr,id,filename){var td=document.createElement("td"),b=document.createElement("button");b.className="viewbtn";b.textContent="View report";b.onclick=async function(){viewer.classList.remove("hidden");viewerTitle.textContent="ROAD 1ST Report";viewerFile.textContent=filename||"";viewerContent.textContent="";viewerLoading.classList.remove("hidden");b.disabled=true;try{var d=await api(A,{method:"POST",body:JSON.stringify({action:"view",kind:"reports",id:id})});showReport(d,id)}catch(e){viewerContent.textContent="Could not read this report: "+(e.message||"Unknown error")}finally{viewerLoading.classList.add("hidden");b.disabled=false}};td.appendChild(b);tr.appendChild(td)}
-function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","App","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.app_version);dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);dl(tr,"defects",x.id);body.appendChild(tr)})}}
+function closeImagePreview(){imagePreview.classList.add("hidden");imagePreviewBody.innerHTML='<div class="image-preview-loading">Loading image…</div>';imagePreviewDownload.onclick=null}
+async function previewImage(kind,id,title,meta){
+  imagePreview.classList.remove("hidden");
+  imagePreviewTitle.textContent=title||"ROAD 1ST Image";
+  imagePreviewMeta.textContent=meta||"";
+  imagePreviewBody.innerHTML='<div class="image-preview-loading">Loading image…</div>';
+  try{
+    var d=await api(A,{method:"POST",body:JSON.stringify({action:"preview",kind:kind,id:id})});
+    var img=document.createElement("img");
+    img.alt=title||"ROAD 1ST image";
+    img.onload=function(){imagePreviewBody.textContent="";imagePreviewBody.appendChild(img)};
+    img.onerror=function(){imagePreviewBody.innerHTML='<div class="image-preview-loading">Could not display this image.</div>'};
+    img.src=d.url;
+    imagePreviewDownload.onclick=function(){downloadFile(kind,id).catch(function(e){status.textContent=e.message})};
+  }catch(e){
+    imagePreviewBody.innerHTML='<div class="image-preview-loading">Could not load preview: '+String(e.message||e)+'</div>';
+  }
+}
+function previewBtn(tr,kind,id,title,meta){
+  var td=document.createElement("td"),b=document.createElement("button");
+  b.className="viewbtn";b.textContent="Preview";
+  b.onclick=function(){previewImage(kind,id,title,meta)};
+  td.appendChild(b);tr.appendChild(td);
+}
+function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","App","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.app_version);previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
 async function load(k){C=k;status.textContent="Loading…";document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent="Showing newest "+(d.items||[]).length+" of "+d.total+"."}
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}
 async function show(){login.classList.add("hidden");dash.classList.remove("hidden");try{await load(C);await counts()}catch(e){status.textContent=e.message;if((e.message||"").indexOf("approved")>=0){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent=e.message}}}
-viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!viewer.classList.contains("hidden"))closeViewer()});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")signin()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
+viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")signin()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
 })();
 </script>
 </body>

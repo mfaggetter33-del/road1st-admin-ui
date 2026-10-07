@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "ROAD 1ST Fleet",
+  "short_name": "ROAD 1ST",
+  "description": "ROAD 1ST secure fleet administration console",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "icons": [
+    {
+      "src": "road1st-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

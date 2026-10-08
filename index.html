@@ -348,6 +348,30 @@ tr:last-child td{border-bottom:0}
 .report-group button:hover,.report-group button:focus-visible{background:rgba(40,210,194,.08)}
 .report-entry[hidden]{display:none!important}
 @media(max-width:720px){.report-filters{align-items:stretch}.report-filters label,.report-filters select{min-width:0;width:100%}}
+
+/* Unified fleet enrolment & compliance controls in the approved ROAD 1ST style. */
+.stats{grid-template-columns:repeat(5,minmax(0,1fr))}
+.stat{min-width:0}
+.stat .sub{line-height:1.4}
+.formgrid,.fleetgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.fleetgrid{gap:13px 16px;margin-top:13px}
+.formgrid>div,.fleetgrid>div{min-width:0}
+select{width:100%;padding:14px 15px;background:#0d131c;border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:15px}
+select:focus{outline:2px solid var(--teal);outline-offset:1px}
+.check{display:flex;gap:9px;align-items:flex-start;margin-top:16px;color:var(--text);font-size:14px;text-transform:none;letter-spacing:normal}
+.check input{width:auto;margin-top:2px}
+.reviewlist{margin-top:20px;border-top:1px solid var(--border);padding-top:14px}
+.reviewitem{padding:11px 0;border-bottom:1px solid var(--border);font-size:13px}
+.reviewitem b{display:block;margin-bottom:4px}
+.compliance-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.compliance-actions button{min-width:150px}
+.qrbox{background:#fff;border-radius:14px;padding:12px;max-width:360px;margin:14px auto}
+.qrbox svg{display:block;width:100%;height:auto}
+.device{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.device button{padding:8px 11px;font-size:12px}
+#fleetPanel,#compliancePanel{margin-top:12px}
+@media(max-width:950px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.stats{grid-template-columns:1fr}.formgrid,.fleetgrid{grid-template-columns:1fr}.device{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -360,15 +384,18 @@ tr:last-child td{border-bottom:0}
 <div class="brand-status"><strong>ROAD 1ST Server</strong>Private reports • Secure downloads</div>
 </div>
 <section id="login" class="card login">
-<h2 id="loginTitle">Admin sign in</h2><div id="loginSub" class="sub">ROAD 1ST Owner access.</div>
+<h2 id="loginTitle">Admin sign in</h2><div id="loginSub" class="sub">Authorised ROAD 1ST owners and fleet managers.</div>
 <label>Email</label><input id="email" type="email" autocomplete="username">
 <label>Password</label><input id="password" type="password" autocomplete="current-password">
 <button id="loginBtn" class="full">Sign in</button>
+<button id="createBtn" class="full teal hidden">Create owner account</button>
 <div id="loginError" class="error"></div>
+<div id="createNote" class="note hidden">Use the email address you want for ROAD 1ST Admin and choose your own password here. Your password goes directly to Supabase and is not sent to ChatGPT.</div>
+<div class="switch"><button id="modeBtn" class="secondary">First time? Create owner login</button></div>
 </section>
 <main id="dash" class="hidden">
 <div class="toolbar"><div><strong id="title">Reports</strong><div class="sub">Private ROAD 1ST server records</div></div><div class="right"><button id="refresh" class="secondary">Refresh</button><button id="logout" class="secondary">Sign out</button></div></div>
-<div class="stats"><div class="stat active" data-kind="reports"><b id="reportsCount">—</b><div class="sub">Reports</div></div><div class="stat" data-kind="fuel"><b id="fuelCount">—</b><div class="sub">Fuel receipts</div></div><div class="stat" data-kind="defects"><b id="defectsCount">—</b><div class="sub">Defect photos</div></div></div>
+<div class="stats"><div class="stat platformOnly active" data-kind="reports"><b id="reportsCount">—</b><div class="sub">Reports</div></div><div class="stat platformOnly" data-kind="fuel"><b id="fuelCount">—</b><div class="sub">Fuel receipts</div></div><div class="stat platformOnly" data-kind="defects"><b id="defectsCount">—</b><div class="sub">Defect photos</div></div><div class="stat" data-kind="fleet"><b>QR</b><div class="sub">Fleet enrolment</div></div><div class="stat platformOnly" data-kind="compliance"><b>✓</b><div class="sub">Ownership & compliance</div></div></div>
 <div id="status" class="status"></div>
 <div id="reportFilters" class="report-filters hidden" aria-label="Report organisation">
   <label for="reportGroup">Group by
@@ -386,7 +413,44 @@ tr:last-child td{border-bottom:0}
   </label>
   <div id="reportCount" class="report-count" aria-live="polite"></div>
 </div>
-<div class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+<div id="recordsTable" class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+<section id="compliancePanel" class="card hidden">
+<h2>Ownership & compliance</h2>
+<div class="sub">Central handover and compliance contacts. These details are stored securely in ROAD 1ST, not in the driver app.</div>
+<div class="formgrid">
+<div><label>Organisation</label><input id="organisationName" autocomplete="organization"></div>
+<div><label>Owner / primary contact</label><input id="ownerName" autocomplete="name"></div>
+<div><label>Owner email</label><input id="ownerEmail" type="email" autocomplete="email"></div>
+<div><label>Owner phone</label><input id="ownerPhone" autocomplete="tel"></div>
+<div><label>Compliance contact</label><input id="complianceName"></div>
+<div><label>Compliance email</label><input id="complianceEmail" type="email"></div>
+<div><label>Technical contact</label><input id="technicalName"></div>
+<div><label>Technical email</label><input id="technicalEmail" type="email"></div>
+<div><label>Privacy contact email</label><input id="privacyEmail" type="email"></div>
+<div><label>Google Play contact email</label><input id="playEmail" type="email"></div>
+</div>
+<label class="check"><input id="routeAll" type="checkbox" checked><span>Route all ROAD 1ST operational and compliance notifications to the owner / primary contact unless a specialist contact is set.</span></label>
+<label>Handover / compliance notes</label><input id="complianceNotes">
+<div class="compliance-actions"><button id="saveCompliance" class="teal">Save contacts</button></div>
+<div id="complianceMeta" class="note"></div>
+<div class="reviewlist"><strong>Compliance review history</strong><div id="reviewList" class="note">No reviews recorded yet.</div></div>
+</section>
+<section id="fleetPanel" class="card hidden">
+<h2>Fleet enrolment</h2>
+<div class="sub">Register ROAD 1ST phones to a fleet with a 30-minute, single-use QR code. The QR does not contain an admin password or permanent company secret.</div>
+<div class="fleetgrid">
+<div><label>Fleet</label><select id="fleetSelect"></select></div>
+<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option>Recommended</option><option>Strict</option></select></div>
+</div>
+<div class="compliance-actions"><button id="saveFleetPreset" class="secondary">Save fleet policy</button></div>
+<div class="fleetgrid">
+<div><label>Driver name</label><input id="newDriverName" placeholder="Driver name"></div>
+<div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
+</div>
+<div id="qrArea" class="hidden"><div id="qrMeta" class="note"></div><div id="qrSvg" class="qrbox"></div></div>
+<div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
+<div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
+</section>
 </main>
 </div>
 
@@ -420,14 +484,16 @@ tr:last-child td{border-bottom:0}
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
 (function(){"use strict";
-var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",A=P+"/functions/v1/road1st-admin-api",S=null,C="reports",CURRENT_REPORT=null,CURRENT_REPORT_FILE="";
-var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
+var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",A=P+"/functions/v1/road1st-admin-api",F=P+"/functions/v1/road1st-fleet-admin-api",S=null,C="reports",CURRENT_REPORT=null,CURRENT_REPORT_FILE="",createMode=false,platformAccess=true,fleetData=null;
+var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),recordsTable=document.getElementById("recordsTable"),compliancePanel=document.getElementById("compliancePanel"),fleetPanel=document.getElementById("fleetPanel"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
 function clear(){S=null;sessionStorage.removeItem("r1a")}
 async function refreshToken(){if(!S||!S.refresh_token)throw Error("Session expired.");var r=await fetch(P+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:S.refresh_token})});var d=await r.json();if(!r.ok)throw Error("Session expired.");save({access_token:d.access_token,refresh_token:d.refresh_token||S.refresh_token,expires_at:Date.now()+(d.expires_in||3600)*1000-30000})}
 async function api(url,opt){if(!S)throw Error("Not signed in.");if(!S.expires_at||Date.now()>=S.expires_at)await refreshToken();opt=opt||{};opt.headers=Object.assign({apikey:K,Authorization:"Bearer "+S.access_token,"Content-Type":"application/json"},opt.headers||{});var r=await fetch(url,opt);if(r.status===401){await refreshToken();opt.headers.Authorization="Bearer "+S.access_token;r=await fetch(url,opt)}var d={};try{d=await r.json()}catch(e){}if(!r.ok){if(r.status===403)throw Error("This account exists but is not yet approved for ROAD 1ST Admin.");throw Error(d.error||("Server error "+r.status))}return d}
 async function signin(){err.textContent="";err.style.color="";var email=document.getElementById("email").value.trim(),password=document.getElementById("password").value,b=document.getElementById("loginBtn");if(!email||!password){err.textContent="Enter email and password.";return}b.disabled=true;try{var r=await fetch(P+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:email,password:password})}),d=await r.json();if(!r.ok)throw Error(d.error_description||d.msg||"Sign in failed.");save({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:Date.now()+(d.expires_in||3600)*1000-30000});await show()}catch(e){err.textContent=e.message||"Sign in failed."}finally{b.disabled=false}}
+async function createAccount(){err.textContent="";err.style.color="";var email=document.getElementById("email").value.trim(),password=document.getElementById("password").value,b=document.getElementById("createBtn");if(!email||!password){err.textContent="Enter email and choose a password.";return}if(password.length<8){err.textContent="Use a password of at least 8 characters.";return}b.disabled=true;try{var r=await fetch(P+"/auth/v1/signup",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({email:email,password:password})}),d=await r.json();if(!r.ok)throw Error(d.msg||d.error_description||"Could not create account.");err.style.color="#28d2c2";err.textContent="Owner login created. Return to ChatGPT and say: owner account created.";}catch(e){err.textContent=e.message||"Could not create account."}finally{b.disabled=false}}
+function toggleMode(){createMode=!createMode;err.textContent="";err.style.color="";document.getElementById("loginTitle").textContent=createMode?"Create ROAD 1ST owner login":"Admin sign in";document.getElementById("loginSub").textContent=createMode?"Create the first authorised account.":"Authorised ROAD 1ST accounts only.";document.getElementById("loginBtn").classList.toggle("hidden",createMode);document.getElementById("createBtn").classList.toggle("hidden",!createMode);document.getElementById("createNote").classList.toggle("hidden",!createMode);document.getElementById("modeBtn").textContent=createMode?"Already have an account? Sign in":"First time? Create owner login"}
 function date(v){try{return new Date(v).toLocaleString()}catch(e){return v||"—"}}function bytes(v){var n=Number(v||0);return n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":(n/1048576).toFixed(1)+" MB"}
 function cell(tr,v){var x=document.createElement("td");x.textContent=v==null||v===""?"—":String(v);tr.appendChild(x)}function headers(a){head.textContent="";var tr=document.createElement("tr");a.forEach(function(v){var th=document.createElement("th");th.textContent=v;tr.appendChild(th)});head.appendChild(tr)}
 async function downloadFile(k,id){var d=await api(A,{method:"POST",body:JSON.stringify({action:"download",kind:k,id:id})}),a=document.createElement("a");a.href=d.url;a.download=d.filename||"";a.rel="noopener";document.body.appendChild(a);a.click();a.remove()}
@@ -607,11 +673,28 @@ async function loadReportPages(){
 reportGroupSelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
 reportCategorySelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
 
+function val(id,v){document.getElementById(id).value=v||""}
+function renderCompliance(d){var p=d.profile||{};val("organisationName",p.organisation_name||"ROAD 1ST");val("ownerName",p.owner_name);val("ownerEmail",p.owner_email);val("ownerPhone",p.owner_phone);val("complianceName",p.compliance_contact_name);val("complianceEmail",p.compliance_contact_email);val("technicalName",p.technical_contact_name);val("technicalEmail",p.technical_contact_email);val("privacyEmail",p.privacy_contact_email);val("playEmail",p.play_console_contact_email);val("complianceNotes",p.notes);document.getElementById("routeAll").checked=p.route_all_notifications_to_owner!==false;document.getElementById("complianceMeta").textContent=p.updated_at?"Last updated "+date(p.updated_at)+".":"";var list=document.getElementById("reviewList"),reviews=d.reviews||[];list.textContent="";if(!reviews.length){list.textContent="No reviews recorded yet.";return}reviews.forEach(function(r){var x=document.createElement("div");x.className="reviewitem";var b=document.createElement("b");b.textContent=(r.review_type||"Compliance review")+" · "+String(r.status||"").replace(/_/g," ");var s=document.createElement("div");s.textContent=r.summary||"";var m=document.createElement("div");m.className="sub";m.textContent=date(r.reviewed_at)+(r.due_at?" · Due "+date(r.due_at):"");x.appendChild(b);x.appendChild(s);x.appendChild(m);list.appendChild(x)})}
+async function saveCompliance(){var b=document.getElementById("saveCompliance");b.disabled=true;status.textContent="Saving ownership and compliance contacts…";try{var payload={action:"update_compliance",organisation_name:document.getElementById("organisationName").value,owner_name:document.getElementById("ownerName").value,owner_email:document.getElementById("ownerEmail").value,owner_phone:document.getElementById("ownerPhone").value,compliance_contact_name:document.getElementById("complianceName").value,compliance_contact_email:document.getElementById("complianceEmail").value,technical_contact_name:document.getElementById("technicalName").value,technical_contact_email:document.getElementById("technicalEmail").value,privacy_contact_email:document.getElementById("privacyEmail").value,play_console_contact_email:document.getElementById("playEmail").value,route_all_notifications_to_owner:document.getElementById("routeAll").checked,notes:document.getElementById("complianceNotes").value};var d=await api(A,{method:"POST",body:JSON.stringify(payload)});renderCompliance({profile:d.profile,reviews:[]});status.textContent="Ownership and compliance contacts saved."}catch(e){status.textContent=e.message||"Could not save contacts."}finally{b.disabled=false}}
+function renderFleet(d){fleetData=d||{};var fleets=d.fleets||[],sel=document.getElementById("fleetSelect"),current=d.fleet||null;sel.textContent="";fleets.forEach(function(f){var o=document.createElement("option");o.value=f.id;o.textContent=f.name;if(current&&f.id===current.id)o.selected=true;sel.appendChild(o)});document.getElementById("fleetPreset").value=current&&current.blocking_preset?current.blocking_preset:"Recommended";var drivers={};(d.drivers||[]).forEach(function(x){drivers[x.id]=x.display_name});var list=document.getElementById("deviceList"),devices=d.devices||[];list.textContent="";if(!devices.length){list.textContent="No devices enrolled.";}devices.forEach(function(x){var row=document.createElement("div");row.className="device";var who=document.createElement("div");who.textContent=drivers[x.driver_id]||"Driver";var dev=document.createElement("div");dev.textContent=x.device_model||"Phone";var seen=document.createElement("div");seen.className="sub";seen.textContent=x.revoked_at?"Revoked":"Last seen "+date(x.last_seen_at);var action=document.createElement("div");if(!x.revoked_at){var b=document.createElement("button");b.className="secondary";b.textContent="Revoke";b.onclick=function(){revokeFleetDevice(x.id)};action.appendChild(b)}row.appendChild(who);row.appendChild(dev);row.appendChild(seen);row.appendChild(action);list.appendChild(row)});var alerts=document.getElementById("fleetAlerts"),events=d.events||[];alerts.textContent="";if(!events.length){alerts.textContent="No recent alerts."}else{events.forEach(function(e){var x=document.createElement("div");x.className="reviewitem";var b=document.createElement("b");b.textContent=(drivers[e.driver_id]||"Driver")+" · PIN reset";var s=document.createElement("div");s.textContent="Self-service identity check: "+String(e.verification_method||"device security").replace(/_/g," ");var m=document.createElement("div");m.className="sub";m.textContent=date(e.client_created_at||e.created_at);x.appendChild(b);x.appendChild(s);x.appendChild(m);alerts.appendChild(x)})}}
+async function loadFleet(fleetId){var url=F+(fleetId?"?fleet_id="+encodeURIComponent(fleetId):"");var d=await api(url);renderFleet(d);return d}
+async function createFleetEnrolment(){var name=document.getElementById("newDriverName").value.trim(),fleetId=document.getElementById("fleetSelect").value,b=document.getElementById("createEnrolment");if(!name){status.textContent="Enter the driver name.";return}b.disabled=true;status.textContent="Creating one-time enrolment QR…";try{var d=await api(F,{method:"POST",body:JSON.stringify({action:"create_enrolment",fleet_id:fleetId,driver_name:name})});var area=document.getElementById("qrArea"),svg=document.getElementById("qrSvg");if(typeof d.qr_svg!=="string"||d.qr_svg.indexOf("<svg")<0)throw Error("QR could not be generated.");svg.innerHTML=d.qr_svg;document.getElementById("qrMeta").textContent=(d.driver&&d.driver.display_name?d.driver.display_name:"Driver")+" · expires "+date(d.expires_at)+" · single use";area.classList.remove("hidden");document.getElementById("newDriverName").value="";status.textContent="QR ready. Scan it with the phone being enrolled.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not create enrolment."}finally{b.disabled=false}}
+async function saveFleetPolicy(){var fleetId=document.getElementById("fleetSelect").value,preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");b.disabled=true;try{await api(F,{method:"POST",body:JSON.stringify({action:"set_fleet_preset",fleet_id:fleetId,blocking_preset:preset})});status.textContent="Fleet policy saved. Enrolled phones pick it up automatically.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not save fleet policy."}finally{b.disabled=false}}
+async function revokeFleetDevice(deviceId){var fleetId=document.getElementById("fleetSelect").value;if(!confirm("Revoke this phone from the fleet?"))return;try{await api(F,{method:"POST",body:JSON.stringify({action:"revoke_device",fleet_id:fleetId,device_id:deviceId})});status.textContent="Phone revoked.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not revoke phone."}}
 function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","App","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.app_version);previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
-async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent="Showing "+reportItems.length+" of "+reportTotal+" reports, organised by date and category.";return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent="Showing newest "+(d.items||[]).length+" of "+d.total+"."}
+async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value);status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent="Showing "+reportItems.length+" of "+reportTotal+" reports, organised by date and category.";return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent="Showing newest "+(d.items||[]).length+" of "+d.total+"."}
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}
-async function show(){login.classList.add("hidden");dash.classList.remove("hidden");try{await load(C);await counts()}catch(e){status.textContent=e.message;if((e.message||"").indexOf("approved")>=0){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent=e.message}}}
-viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")signin()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
+async function show(){login.classList.add("hidden");dash.classList.remove("hidden");var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
+document.getElementById("saveCompliance").onclick=saveCompliance;
+document.getElementById("createEnrolment").onclick=createFleetEnrolment;
+document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
+document.getElementById("fleetSelect").onchange=function(){
+  document.getElementById("qrArea").classList.add("hidden");
+  loadFleet(this.value).catch(function(e){status.textContent=e.message});
+};
+document.getElementById("createBtn").onclick=createAccount;
+document.getElementById("modeBtn").onclick=toggleMode;
+viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
 })();
 </script>
 </body>

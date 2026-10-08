@@ -337,6 +337,17 @@ tr:last-child td{border-bottom:0}
   .viewer-grid{grid-template-columns:1fr}
   .timeline-item{grid-template-columns:1fr;gap:4px}
 }
+
+/* Reports: grouped dates and categories; other portal sections unchanged. */
+.report-filters{display:flex;align-items:end;gap:14px;flex-wrap:wrap;padding:14px 16px;margin:10px 0 14px;border:1px solid var(--border);border-radius:13px;background:var(--surface)}
+.report-filters label{display:flex;flex-direction:column;gap:5px;margin:0;min-width:190px}
+.report-filters select{min-width:190px;padding:10px 12px}
+.report-count{flex:1;min-width:140px;color:var(--muted);font-size:13px;padding-bottom:9px}
+.report-group td{padding:0!important;background:var(--surface-alt);border-bottom:1px solid var(--border)}
+.report-group button{display:block;width:100%;padding:13px 16px;background:transparent;border:0;text-align:left;color:var(--teal);font-weight:700}
+.report-group button:hover,.report-group button:focus-visible{background:rgba(40,210,194,.08)}
+.report-entry[hidden]{display:none!important}
+@media(max-width:720px){.report-filters{align-items:stretch}.report-filters label,.report-filters select{min-width:0;width:100%}}
 </style>
 </head>
 <body>
@@ -358,7 +369,24 @@ tr:last-child td{border-bottom:0}
 <main id="dash" class="hidden">
 <div class="toolbar"><div><strong id="title">Reports</strong><div class="sub">Private ROAD 1ST server records</div></div><div class="right"><button id="refresh" class="secondary">Refresh</button><button id="logout" class="secondary">Sign out</button></div></div>
 <div class="stats"><div class="stat active" data-kind="reports"><b id="reportsCount">—</b><div class="sub">Reports</div></div><div class="stat" data-kind="fuel"><b id="fuelCount">—</b><div class="sub">Fuel receipts</div></div><div class="stat" data-kind="defects"><b id="defectsCount">—</b><div class="sub">Defect photos</div></div></div>
-<div id="status" class="status"></div><div class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+<div id="status" class="status"></div>
+<div id="reportFilters" class="report-filters hidden" aria-label="Report organisation">
+  <label for="reportGroup">Group by
+    <select id="reportGroup"><option value="day">Day</option><option value="week">Week</option></select>
+  </label>
+  <label for="reportCategory">Category
+    <select id="reportCategory"><option value="all">All categories</option>
+      <option value="Journeys">Journeys &amp; checkpoints</option>
+      <option value="Walkaround">Walkaround checks</option>
+      <option value="App blocking">App-blocking tests</option>
+      <option value="Setup">Setup reports</option>
+      <option value="Ferry mode">Ferry mode</option>
+      <option value="Other">Other</option>
+    </select>
+  </label>
+  <div id="reportCount" class="report-count" aria-live="polite"></div>
+</div>
+<div class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
 </main>
 </div>
 
@@ -510,8 +538,77 @@ function previewBtn(tr,kind,id,title,meta){
   b.onclick=function(){previewImage(kind,id,title,meta)};
   td.appendChild(b);tr.appendChild(td);
 }
+
+var reportItems=[], reportTotal=0, reportOpenGroups=new Set();
+var reportGroupSelect=document.getElementById("reportGroup"),reportCategorySelect=document.getElementById("reportCategory");
+function reportDayKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function reportBucket(timestamp,grouping){
+  var dt=new Date(timestamp);
+  if(!Number.isFinite(dt.getTime()))return {key:"unknown",label:"Unknown date"};
+  if(grouping==="week"){
+    var monday=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate());
+    monday.setDate(monday.getDate()-(monday.getDay()+6)%7);
+    return {key:reportDayKey(monday),label:"Week of "+monday.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})};
+  }
+  return {key:reportDayKey(dt),label:dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"})};
+}
+function renderReportGroups(){
+  var grouping=reportGroupSelect.value,category=reportCategorySelect.value;
+  var filtered=reportItems.filter(function(x){return category==="all"||(x.category||"Other")===category});
+  document.getElementById("reportCount").textContent=filtered.length+" of "+reportTotal+" reports";
+  body.textContent="";
+  headers(["Received","Category","App","File","Lines","Size","View","Download"]);
+  if(!filtered.length){
+    var empty=document.createElement("tr"),td=document.createElement("td");td.colSpan=8;
+    td.textContent="No reports in this category.";empty.appendChild(td);body.appendChild(empty);return;
+  }
+  var buckets=new Map();
+  filtered.forEach(function(x){
+    var g=reportBucket(x.created_at,grouping);
+    if(!buckets.has(g.key))buckets.set(g.key,{label:g.label,items:[]});
+    buckets.get(g.key).items.push(x);
+  });
+  if(reportOpenGroups.size===0)reportOpenGroups.add(buckets.keys().next().value);
+  buckets.forEach(function(g,key){
+    var groupRow=document.createElement("tr"),groupCell=document.createElement("td"),toggle=document.createElement("button");
+    var opened=reportOpenGroups.has(key),entries=[];
+    groupRow.className="report-group";groupCell.colSpan=8;
+    toggle.type="button";toggle.setAttribute("aria-expanded",String(opened));
+    toggle.textContent=(opened?"▾ ":"▸ ")+g.label+" · "+g.items.length+" report"+(g.items.length===1?"":"s");
+    toggle.onclick=function(){
+      opened=!opened;
+      if(opened)reportOpenGroups.add(key);else reportOpenGroups.delete(key);
+      toggle.setAttribute("aria-expanded",String(opened));
+      toggle.textContent=(opened?"▾ ":"▸ ")+g.label+" · "+g.items.length+" report"+(g.items.length===1?"":"s");
+      entries.forEach(function(row){row.hidden=!opened});
+    };
+    groupCell.appendChild(toggle);groupRow.appendChild(groupCell);body.appendChild(groupRow);
+    g.items.forEach(function(x){
+      var tr=document.createElement("tr");tr.className="report-entry";tr.hidden=!opened;
+      cell(tr,date(x.created_at));cell(tr,x.category||"Other");cell(tr,x.app_version);
+      cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));
+      viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);
+      body.appendChild(tr);entries.push(tr);
+    });
+  });
+}
+async function loadReportPages(){
+  var all=[],total=0;
+  for(var pass=0;pass<100;pass++){
+    var page=await api(A+"?kind=reports&limit=100&offset="+all.length);
+    var incoming=page.items||[];
+    total=Number(page.total||0);
+    if(!incoming.length)break;
+    all.push.apply(all,incoming);
+    if(all.length>=total)break;
+  }
+  return {items:all,total:total};
+}
+reportGroupSelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
+reportCategorySelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
+
 function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","App","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.app_version);previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
-async function load(k){C=k;status.textContent="Loading…";document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent="Showing newest "+(d.items||[]).length+" of "+d.total+"."}
+async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent="Showing "+reportItems.length+" of "+reportTotal+" reports, organised by date and category.";return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent="Showing newest "+(d.items||[]).length+" of "+d.total+"."}
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}
 async function show(){login.classList.add("hidden");dash.classList.remove("hidden");try{await load(C);await counts()}catch(e){status.textContent=e.message;if((e.message||"").indexOf("approved")>=0){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent=e.message}}}
 viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")signin()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();

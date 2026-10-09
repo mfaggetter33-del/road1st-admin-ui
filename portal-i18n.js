@@ -119,7 +119,19 @@
     });
     observer.observe(document.body, { subtree: true, childList: true, characterData: true });
   }
-  window.ROAD1ST_PORTAL_LANGUAGE = { get: function () { return locale; }, set: setLanguage, translate: label };
+  // Lookup only: does not switch the signed-in manager's portal language or mutate the DOM.
+  // PDF language selection must be independent of the manager's current interface language.
+  function translateFor(code, source) {
+    var translated = valid(code) && dictionary[code] && dictionary[code][source];
+    return translated || source;
+  }
+  window.ROAD1ST_PORTAL_LANGUAGE = {
+    get: function () { return locale; },
+    set: setLanguage,
+    translate: label,
+    translateFor: translateFor,
+    names: function () { return Object.assign({}, data.names); }
+  };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 })();

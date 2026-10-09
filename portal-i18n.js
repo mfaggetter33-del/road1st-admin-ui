@@ -15,6 +15,11 @@
       if (extended.length === data.more.keys.length) data.more.keys.forEach(function (word, i) { map[word] = extended[i]; });
       else console.warn("ROAD 1ST portal explanations incomplete:", code);
     }
+    if (data.report && data.report.keys && data.report.rows && data.report.rows[code]) {
+      var details = data.report.rows[code];
+      if (details.length === data.report.keys.length) data.report.keys.forEach(function (word, i) { map[word] = details[i]; });
+      else console.warn("ROAD 1ST report translations incomplete:", code);
+    }
     dictionary[code] = map;
   });
 

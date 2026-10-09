@@ -25,6 +25,15 @@
       if (messages.length === data.messages.keys.length) data.messages.keys.forEach(function (word, i) { map[word] = messages[i]; });
       else console.warn("ROAD 1ST messages incomplete:", code);
     }
+    ["events","generatedReports"].forEach(function (group) {
+      var more = data[group], entries = more && more.rows && more.rows[code];
+      if (!more || !entries) return;
+      if (entries.length !== more.keys.length) {
+        console.warn("ROAD 1ST locale group incomplete:", group, code);
+        return;
+      }
+      more.keys.forEach(function (word, i) { map[word] = entries[i]; });
+    });
     dictionary[code] = map;
   });
 

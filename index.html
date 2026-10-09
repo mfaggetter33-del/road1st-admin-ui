@@ -465,6 +465,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
       <div><h2 id="viewerTitle">ROAD 1ST Report</h2><div id="viewerFile" class="sub"></div></div>
       <div class="viewer-actions">
         <button id="viewerPdf">Download PDF report</button>
+        <button id="viewerPdfLocalized" class="secondary">Print / Save PDF</button>
         <button id="viewerDownload" class="teal">Download original</button>
         <button id="viewerClose" class="secondary">Close</button>
       </div>
@@ -494,6 +495,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <script src="portal-generated-report-locales.js"></script>
 <script src="portal-timeline-locales.js"></script>
 <script src="portal-i18n.js"></script>
+<script src="portal-pdf-print.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
 (function(){"use strict";
@@ -518,6 +520,15 @@ function controlName(v){var m={temporary_stop:"Temporary Stop",police_stop:"Poli
 function eventDetail(r){if(!r)return "";switch(r.event){case"session_start":return [words(r.vehicle_type),r.journey_mode,r.start_mode].filter(Boolean).join(" • ");case"session_end":return "Reason: "+words(r.reason||"ended");case"driving_activated":return words(r.reason||"movement detected");case"bluetooth_changed":return "Vehicle Bluetooth: "+words(r.state);case"trip_control":var d=controlName(r.control);if(r.duration_minutes)d+=" • "+r.duration_minutes+" min";if(r.resumed_from)d+=" • from "+controlName(r.resumed_from);return d;case"gps_quality_changed":return "Quality: "+words(r.quality);case"gps_monitoring_changed":return "State: "+words(r.state);case"cloud_checkpoint":return "Saved while journey active • "+words(r.reason);case"cloud_checkpoint_failed":return "Error: "+(r.error||"checkpoint failed");case"crew_event":return [controlName(r.control),r.detail].filter(Boolean).join(" • ");case"setup_step_action":case"setup_step_result":return [words(r.step),words(r.result||r.detail)].filter(Boolean).join(" • ");case"setup_wizard_start":case"setup_wizard_end":return words(r.result||r.step||"");default:var bits=[];["state","quality","control","reason","detail","result"].forEach(function(k){if(r[k]!=null&&r[k]!=="")bits.push(words(r[k]))});return bits.join(" • ")}}
 function pdfSafe(v){return String(v==null||v===""?"—":v).replace(/[•×]/g,function(c){return c==="×"?"x":"-"})}
 function pdfFileName(){var d=CURRENT_REPORT&&CURRENT_REPORT.start_utc?new Date(CURRENT_REPORT.start_utc):new Date(),p=isNaN(d.getTime())?"report":d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0");return "ROAD1ST-Journey-"+p+".pdf"}
+function printTranslatedPdfReport(){
+  if(!CURRENT_REPORT){status.textContent="Open a report first.";return}
+  try{
+    window.ROAD1ST_TRANSLATED_PDF.openReport({
+      report:CURRENT_REPORT,filename:CURRENT_REPORT_FILE,locale:portalLocale(),translate:reportT,
+      duration:duration,words:words,eventName:eventName,eventDetail:eventDetail,controlName:controlName
+    });
+  }catch(e){status.textContent=e.message||"Could not open translated PDF print view."}
+}
 function downloadPdfReport(){
   if(!CURRENT_REPORT){status.textContent="Open a report first.";return}
   if(!window.jspdf||!window.jspdf.jsPDF){status.textContent="PDF generator did not load. Check the internet connection and try again.";return}
@@ -708,7 +719,7 @@ document.getElementById("fleetSelect").onchange=function(){
 };
 document.getElementById("createBtn").onclick=createAccount;
 document.getElementById("modeBtn").onclick=toggleMode;
-viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
+viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerPdfLocalized").onclick=printTranslatedPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
 })();
 </script>
 </body>

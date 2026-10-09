@@ -25,7 +25,7 @@
       if (messages.length === data.messages.keys.length) data.messages.keys.forEach(function (word, i) { map[word] = messages[i]; });
       else console.warn("ROAD 1ST messages incomplete:", code);
     }
-    ["events","generatedReports"].forEach(function (group) {
+    ["events","generatedReports","timeline"].forEach(function (group) {
       var more = data[group], entries = more && more.rows && more.rows[code];
       if (!more || !entries) return;
       if (entries.length !== more.keys.length) {

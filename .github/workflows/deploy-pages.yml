@@ -25,6 +25,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check portal language packs and safe selectors
+        run: |
+          node --check portal-translations.js
+          node --check portal-explanations.js
+          node --check portal-i18n.js
+          node check-portal-locales.cjs
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:

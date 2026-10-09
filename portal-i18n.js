@@ -10,6 +10,11 @@
     var row = data.rows[code], map = {};
     if (row.length !== data.keys.length) { console.warn("ROAD 1ST portal locale incomplete:", code); return; }
     data.keys.forEach(function (word, i) { map[word] = row[i]; });
+    if (data.more && data.more.keys && data.more.rows && data.more.rows[code]) {
+      var extended = data.more.rows[code];
+      if (extended.length === data.more.keys.length) data.more.keys.forEach(function (word, i) { map[word] = extended[i]; });
+      else console.warn("ROAD 1ST portal explanations incomplete:", code);
+    }
     dictionary[code] = map;
   });
 

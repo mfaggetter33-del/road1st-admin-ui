@@ -1,0 +1,2 @@
+/* ROAD 1ST fleet portal report display labels. Existing report data and original PDFs remain untouched. */
+window.ROAD1ST_PORTAL_TEXT.report={keys:["Journey overview","GPS usable","App version","Journey mode","Start mode","End reason","Automatic resumes","Bluetooth connected events","Bluetooth disconnected events","Cloud checkpoints","Blocked apps","Stops, breaks and controls","No recorded failures or GPS-disable events.","No timeline events available.","Not activated","Phone","Driver","Revoked","Last seen","Revoke"],rows:{}};

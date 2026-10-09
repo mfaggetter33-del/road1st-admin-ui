@@ -224,6 +224,9 @@ tr:last-child td{border-bottom:0}
 .viewer-head h2{margin:0;font-size:23px}
 .viewer-body{padding:20px}
 .viewer-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pdf-language-control{display:flex;align-items:center;gap:7px;background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;padding:5px 9px}
+.pdf-language-control label{margin:0;letter-spacing:.02em;color:var(--teal);font-size:11px;white-space:nowrap}
+.pdf-language-control select{max-width:145px;min-width:110px;border:0;border-radius:6px;background:#0d131c;color:var(--text);padding:7px 6px;font-size:12px;cursor:pointer}
 .viewer-summary{
   display:grid;
   grid-template-columns:repeat(4,1fr);
@@ -464,6 +467,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     <div class="viewer-head">
       <div><h2 id="viewerTitle">ROAD 1ST Report</h2><div id="viewerFile" class="sub"></div></div>
       <div class="viewer-actions">
+        <div class="pdf-language-control"><label for="pdfReportLanguage">PDF: <span>Language</span></label><select id="pdfReportLanguage" aria-label="PDF report language"></select></div>
         <button id="viewerPdf">Download PDF report</button>
         <button id="viewerPdfLocalized" class="secondary" data-portal-i18n-title="Print / Save PDF">Print / Save PDF</button>
         <button id="viewerDownload" class="teal">Download original</button>
@@ -521,12 +525,61 @@ function controlName(v){var m={temporary_stop:"Temporary Stop",police_stop:"Poli
 function eventDetail(r){if(!r)return "";switch(r.event){case"session_start":return [words(r.vehicle_type),r.journey_mode,r.start_mode].filter(Boolean).join(" • ");case"session_end":return "Reason: "+words(r.reason||"ended");case"driving_activated":return words(r.reason||"movement detected");case"bluetooth_changed":return "Vehicle Bluetooth: "+words(r.state);case"trip_control":var d=controlName(r.control);if(r.duration_minutes)d+=" • "+r.duration_minutes+" min";if(r.resumed_from)d+=" • from "+controlName(r.resumed_from);return d;case"gps_quality_changed":return "Quality: "+words(r.quality);case"gps_monitoring_changed":return "State: "+words(r.state);case"cloud_checkpoint":return "Saved while journey active • "+words(r.reason);case"cloud_checkpoint_failed":return "Error: "+(r.error||"checkpoint failed");case"crew_event":return [controlName(r.control),r.detail].filter(Boolean).join(" • ");case"setup_step_action":case"setup_step_result":return [words(r.step),words(r.result||r.detail)].filter(Boolean).join(" • ");case"setup_wizard_start":case"setup_wizard_end":return words(r.result||r.step||"");default:var bits=[];["state","quality","control","reason","detail","result"].forEach(function(k){if(r[k]!=null&&r[k]!=="")bits.push(words(r[k]))});return bits.join(" • ")}}
 function pdfSafe(v){return String(v==null||v===""?"—":v).replace(/[•×]/g,function(c){return c==="×"?"x":"-"})}
 function pdfFileName(){var d=CURRENT_REPORT&&CURRENT_REPORT.start_utc?new Date(CURRENT_REPORT.start_utc):new Date(),p=isNaN(d.getTime())?"report":d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0");return "ROAD1ST-Journey-"+p+".pdf"}
+// The PDF choice is intentionally independent of the manager's portal setting.
+function populatePdfReportLanguages(){
+  var select=document.getElementById("pdfReportLanguage");
+  if(select.options.length)return;
+  var names=window.ROAD1ST_PORTAL_TEXT&&window.ROAD1ST_PORTAL_TEXT.names || {en:"English"};
+  Object.keys(names).forEach(function(code){
+    var option=document.createElement("option");option.value=code;option.textContent=names[code];select.appendChild(option);
+  });
+}
+function pdfReportLocale(){
+  var select=document.getElementById("pdfReportLanguage");
+  return select&&select.value ? select.value : portalLocale();
+}
+function pdfReportT(label){
+  var lang=window.ROAD1ST_PORTAL_LANGUAGE;
+  return lang&&lang.translateFor ? lang.translateFor(pdfReportLocale(),label) : reportT(label);
+}
+function pdfEventName(r){
+  var lookup={session_start:"Journey started",session_end:"Journey ended",driving_activated:"Driving Mode activated",bluetooth_changed:"Bluetooth",trip_control:"Journey control",gps_disabled:"GPS disabled",gps_enabled:"GPS enabled",gps_quality_changed:"GPS quality",gps_monitoring_changed:"GPS monitoring",cloud_checkpoint:"Cloud checkpoint",cloud_checkpoint_failed:"Cloud checkpoint failed",crew_event:"Crew event",setup_wizard_start:"Setup wizard started",setup_wizard_end:"Setup wizard ended",setup_step_action:"Setup step",setup_step_result:"Setup step result"};
+  return pdfReportT(lookup[r.event]||words(r.event));
+}
+function pdfControlName(v){
+  var lookup={temporary_stop:"Temporary Stop",police_stop:"Police Stop",emergency_breakdown:"Emergency / Breakdown",other_work:"Other Work",break_rest:"Break / Rest",resume_protection:"Resume Protection",auto_resume_on_movement:"Automatic resume on movement"};
+  return pdfReportT(lookup[v]||words(v));
+}
+function pdfEventDetail(r){
+  if(!r)return "";
+  switch(r.event){
+    case "session_start":return [words(r.vehicle_type),r.journey_mode,r.start_mode].filter(Boolean).join(" • ");
+    case "session_end":return pdfReportT("End reason")+": "+words(r.reason||"ended");
+    case "driving_activated":return words(r.reason||"movement detected");
+    case "bluetooth_changed":return pdfReportT("Bluetooth")+": "+words(r.state);
+    case "trip_control":
+      var detail=pdfControlName(r.control);
+      if(r.duration_minutes)detail+=" • "+r.duration_minutes+" min";
+      if(r.resumed_from)detail+=" • → "+pdfControlName(r.resumed_from);
+      return detail;
+    case "gps_quality_changed":return pdfReportT("GPS quality")+": "+words(r.quality);
+    case "gps_monitoring_changed":return pdfReportT("GPS monitoring")+": "+words(r.state);
+    case "cloud_checkpoint":return pdfReportT("Cloud checkpoint")+" • "+words(r.reason);
+    case "cloud_checkpoint_failed":return pdfReportT("Cloud checkpoint failed")+": "+(r.error||"checkpoint failed");
+    case "crew_event":return [pdfControlName(r.control),r.detail].filter(Boolean).join(" • ");
+    case "setup_step_action":case "setup_step_result":return [words(r.step),r.result||r.detail].filter(Boolean).join(" • ");
+    case "setup_wizard_start":case "setup_wizard_end":return r.result||r.step||"";
+    default:
+      var bits=[];["state","quality","control","reason","detail","result"].forEach(function(k){if(r[k]!=null&&r[k]!=="")bits.push(String(r[k]))});
+      return bits.join(" • ");
+  }
+}
 function printTranslatedPdfReport(){
   if(!CURRENT_REPORT){status.textContent="Open a report first.";return}
   try{
     window.ROAD1ST_TRANSLATED_PDF.openReport({
-      report:CURRENT_REPORT,filename:CURRENT_REPORT_FILE,locale:portalLocale(),translate:reportT,
-      duration:duration,words:words,eventName:eventName,eventDetail:eventDetail,controlName:controlName
+      report:CURRENT_REPORT,filename:CURRENT_REPORT_FILE,locale:pdfReportLocale(),translate:pdfReportT,
+      duration:duration,words:words,eventName:pdfEventName,eventDetail:pdfEventDetail,controlName:pdfControlName
     });
   }catch(e){status.textContent=e.message||"Could not open translated PDF print view."}
 }
@@ -598,7 +651,8 @@ function addKpi(parent,label,value){var x=document.createElement("div"),b=docume
 function addRow(parent,label,value){var x=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong");x.className="viewer-row";a.textContent=label;b.textContent=value==null||value===""?"—":String(value);x.appendChild(a);x.appendChild(b);parent.appendChild(x)}
 function section(title){var x=document.createElement("section"),h=document.createElement("h3");x.className="viewer-section";h.textContent=title;x.appendChild(h);viewerContent.appendChild(x);return x}
 function closeViewer(){viewer.classList.add("hidden");viewerContent.textContent="";viewerDownload.onclick=null;CURRENT_REPORT=null;CURRENT_REPORT_FILE=""}
-function showReport(d,id){var r=d.report||{};CURRENT_REPORT=r;CURRENT_REPORT_FILE=d.filename||"";viewerContent.textContent="";viewerTitle.textContent=r.report_type==="setup_wizard"?"ROAD 1ST Setup Report":"ROAD 1ST Journey Report";viewerFile.textContent=d.filename||"";viewerDownload.onclick=function(){downloadFile("reports",id).catch(function(e){status.textContent=e.message})};
+function showReport(d,id){var r=d.report||{};CURRENT_REPORT=r;CURRENT_REPORT_FILE=d.filename||"";
+populatePdfReportLanguages();document.getElementById("pdfReportLanguage").value=portalLocale();viewerContent.textContent="";viewerTitle.textContent=r.report_type==="setup_wizard"?"ROAD 1ST Setup Report":"ROAD 1ST Journey Report";viewerFile.textContent=d.filename||"";viewerDownload.onclick=function(){downloadFile("reports",id).catch(function(e){status.textContent=e.message})};
 var sum=document.createElement("div");sum.className="viewer-summary";addKpi(sum,"Duration",duration(r.duration_seconds));addKpi(sum,"Maximum speed",r.max_speed_kmh==null?"—":r.max_speed_kmh+" km/h");addKpi(sum,"Driving Mode",r.driving_activations?("Activated "+r.driving_activations+"×"):"Not activated");addKpi(sum,"GPS usable",r.gps_samples?(r.usable_gps_samples+" / "+r.gps_samples):"—");viewerContent.appendChild(sum);
 var details=section("Journey summary"),grid=document.createElement("div");grid.className="viewer-grid";addRow(grid,"Started",date(r.start_utc));addRow(grid,"Finished",date(r.end_utc));addRow(grid,"App version",r.version);addRow(grid,"Vehicle",words(r.vehicle_type));addRow(grid,"Journey mode",r.journey_mode);addRow(grid,"Start mode",words(r.start_mode));addRow(grid,"End reason",words(r.end_reason));addRow(grid,"Automatic resumes",r.auto_resumes);addRow(grid,"Bluetooth connected events",r.bluetooth_connected_events);addRow(grid,"Bluetooth disconnected events",r.bluetooth_disconnected_events);addRow(grid,"Cloud checkpoints",r.checkpoints);addRow(grid,"Blocked apps",r.blocked_app_count);details.appendChild(grid);
 var controls=r.controls||{},keys=Object.keys(controls).filter(function(k){return k!=="auto_resume_on_movement"});if(keys.length){var cs=section("Stops, breaks and controls");keys.forEach(function(k){addRow(cs,controlName(k),controls[k]+" recorded")})}

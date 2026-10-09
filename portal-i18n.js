@@ -27,7 +27,8 @@
     var el = node.parentElement;
     if (!el) return true;
     if (el.closest("script,style,noscript,svg,code,pre,#fleetSelect")) return true;
-    if (el.closest("#recordsTable td:not(:has(button))")) return true;
+    var tableCell = el.closest("#recordsTable td");
+    if (tableCell && !tableCell.querySelector("button")) return true;
     if (el.closest("#deviceList .device,#fleetAlerts .reviewitem,#reviewList .reviewitem,#qrMeta,#viewerFile,#imagePreviewMeta")) return true;
     if (el.closest("#viewerContent .viewer-row strong,#viewerContent .viewer-kpi b,#viewerContent .timeline-detail,#viewerContent .timeline-time,#viewerContent .timeline-event")) return true;
     return false;

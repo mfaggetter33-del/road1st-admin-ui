@@ -4,10 +4,18 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const context = { window: {} };
-for (const source of ["portal-translations.js", "portal-explanations.js", "portal-report-translations.js"]) {
+for (const source of ["portal-translations.js", "portal-explanations.js", "portal-report-translations.js", "portal-messages.js"]) {
   vm.runInNewContext(fs.readFileSync(source, "utf8"), context, { filename: source });
 }
 const data = context.window.ROAD1ST_PORTAL_TEXT;
+assert.ok(data.messages, "portal sign-in and QR messages present");
+assert.equal(new Set(data.messages.keys).size, data.messages.keys.length);
+assert.equal(Object.keys(data.messages.rows).length, 31, "all 31 translated dynamic message packs");
+for(const code of Object.keys(data.names).filter(x=>x!=="en")){
+  const messages=data.messages.rows[code];
+  assert.ok(messages && messages.length===data.messages.keys.length, code+" messages complete");
+  assert.ok(messages.every(x=>typeof x==="string"&&x.trim()),code+" has empty messages");
+}
 assert.ok(data && data.report, "report language resources present");
 assert.equal(new Set(data.report.keys).size, data.report.keys.length, "report detail labels unique");
 assert.equal(Object.keys(data.report.rows).length, 31, "all report languages");
@@ -30,13 +38,14 @@ for (const code of codes.filter(x => x !== "en")) {
   for (const s of main.concat(more)) assert.ok(typeof s === "string" && s.trim(), code + " empty text");
 }
 const html = fs.readFileSync("index.html", "utf8");
-for (const name of ["portalLanguage", "portal-translations.js", "portal-explanations.js", "portal-report-translations.js", "portal-i18n.js"])
+for (const name of ["portalLanguage", "portal-translations.js", "portal-explanations.js", "portal-report-translations.js", "portal-messages.js", "portal-i18n.js"])
   assert.ok(html.includes(name), "missing portal integration " + name);
 for (const policy of ["Recommended", "Strict"])
   assert.ok(html.includes('<option value="' + policy + '">' + policy + '</option>'),
     "fleet policy values must remain untranslated: " + policy);
 assert.ok(html.indexOf("portal-translations.js") < html.indexOf("portal-explanations.js"));
 assert.ok(html.indexOf("portal-explanations.js") < html.indexOf("portal-i18n.js"));
+assert.ok(html.includes("ROAD1ST_PORTAL_LANGUAGE.translate(\"Revoke this phone from the fleet?\")"), "revocation confirmation is translated");
 assert.ok(html.includes('F=P+"/functions/v1/road1st-fleet-admin-api"'), "original fleet API retained");
 assert.ok(html.includes('A=P+"/functions/v1/road1st-admin-api"'), "original report API retained");
 const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="portal-translations.js"'))
@@ -44,10 +53,10 @@ const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="porta
   .replace(/<[^>]+>/g, "|")
   .replace(/&amp;/g, "&")
   .split("|").map(x => x.trim()).filter(x => x.length > 1);
-const coverage = new Set(data.keys.concat(data.more.keys, data.report.keys, [
+const coverage = new Set(data.keys.concat(data.more.keys, data.report.keys, data.messages.keys, [
   "ROAD 1ST ADMIN", "ROAD 1ST Server", "QR"
 ]));
 const missing = [...new Set(text)].filter(x => !coverage.has(x));
 assert.deepEqual(missing, [], "untranslated static portal labels");
-console.log("PASS: 32 manager languages; " + (data.keys.length + data.more.keys.length + data.report.keys.length)
+console.log("PASS: 32 manager languages; " + (data.keys.length + data.more.keys.length + data.report.keys.length + data.messages.keys.length)
   + " phrases per translated locale; approved portal endpoints/policies retained.");

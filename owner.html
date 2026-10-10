@@ -162,7 +162,7 @@ async function api(url,option){
  return d;
 }
 function ownerVisible(yes){el("dashboard").classList.toggle("hidden",!yes);el("login").classList.toggle("hidden",yes);el("logout").classList.toggle("hidden",!yes)}
-function isPilot(f){return /^ROAD\\s*1ST\\s*Pilot\\s*Fleet$/i.test(String(f.name||""))}
+function isPilot(f){return /^ROAD\s*1ST\s*Pilot\s*Fleet$/i.test(String(f.name||""))}
 function addFleetRow(area,f,pilot){
  var item=document.createElement("div");item.className="company";
  var info=document.createElement("div"),head=document.createElement("div");
@@ -204,34 +204,67 @@ function copyInvitation(a){
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(message).then(function(){status("Invitation copied. You still need to send it to the customer.")}).catch(function(){window.prompt("Copy invitation",message)})}
  else window.prompt("Copy invitation",message);
 }
-async function decide(a,action,b){
- var verb=action==="approve"?"Approve":"Decline";
- if(!window.confirm(verb+" application for "+a.company_name+"?\n\n"+(action==="approve"?"This creates a private fleet account. You will need to send the invitation.":"No fleet account will be activated.")))return;
+function reasonInput(a,editing){
+ var current=a.decline_reason||"";
+ var response=window.prompt((editing?"Edit private decline reason for ":"Reason for declining ")+a.company_name+"\n(Only the ROAD 1ST owner can see this note; 3–500 characters.)",current);
+ if(response===null)return null;
+ var reason=response.trim();
+ if(reason.length<3||reason.length>500){status("Please give a reason between 3 and 500 characters.");return null}
+ return reason;
+}
+async function ownerDecision(a,action,b){
+ var messages={
+  approve:"Approve "+a.company_name+" and create a private fleet account?\n\nYou will need to send the invitation separately.",
+  decline:"Decline the application for "+a.company_name+"?",
+  reconsider:"Move "+a.company_name+" back to Pending for reconsideration?",
+  clear:"Clear "+a.company_name+" from your application list?\n\nThis hides the enquiry from this list, retaining the decision record and any approved fleet account."
+ };
+ var body={action:action,application_id:a.id};
+ if(action==="decline"){
+  var reason=reasonInput(a,false);if(reason===null)return;
+  body.decline_reason=reason;
+ }
+ if(action==="save_decline_reason"){
+  var revised=reasonInput(a,true);if(revised===null)return;
+  body.decline_reason=revised;
+ }else if(!window.confirm(messages[action]||"Confirm this change?"))return;
  b.disabled=true;
  try{
-  await api(O,{method:"POST",body:JSON.stringify({action:action,application_id:a.id})});
-  status("Application "+(action==="approve"?"approved":"declined")+".");
+  await api(O,{method:"POST",body:JSON.stringify(body)});
+  status(action==="clear"?"Application cleared from the list.":action==="reconsider"?"Application returned to Pending.":action==="approve"?"Application approved; invitation must be sent separately.":action==="decline"?"Application declined and private reason saved.":"Decline reason saved.");
   await refresh();
- }catch(e){status("Could not "+verb.toLowerCase()+" application: "+e.message);b.disabled=false}
+ }catch(e){status("Application update failed: "+e.message);b.disabled=false}
 }
 function renderApplications(){
  var area=el("applications");area.textContent="";
  var pend=applications.filter(function(a){return a.status==="pending"}).length;
  el("pendingCount").textContent=pend;
- if(!applications.length){area.appendChild(txt("p","No fleet applications received yet.","empty"));return}
+ if(!applications.length){area.appendChild(txt("p","No fleet applications awaiting management.","empty"));return}
  applications.forEach(function(a){
  var item=document.createElement("div");item.className="application";
  var info=document.createElement("div");
  info.appendChild(txt("strong",a.company_name));
  rowMeta(info,[a.contact_name,a.contact_email,a.phone].filter(Boolean).join(" · "));
  rowMeta(info,"Received "+date(a.submitted_at)+(a.expected_vehicles?" · "+a.expected_vehicles+" expected vehicles":""));
- info.appendChild(txt("span",a.status==="pending"?"Pending":a.status==="approved"?"Approved":"Declined","pill "+(a.status||"pending")));
+ var statusLabel=a.status==="pending"?"Pending":a.status==="approved"?"Approved":"Declined";
+ info.appendChild(txt("span",statusLabel,"pill "+(a.status||"pending")));
+ if(a.status==="declined")rowMeta(info,"Reason: "+(a.decline_reason||"Not recorded yet"));
+ else if(a.decline_reason)rowMeta(info,"Previous decline reason: "+a.decline_reason);
  var actions=document.createElement("div");actions.className="row-actions";
  if(a.status==="pending"){
-  var yes=button("Approve",function(){decide(a,"approve",yes)},"teal");
-  var no=button("Decline",function(){decide(a,"decline",no)});
+  var yes=button("Approve",function(){ownerDecision(a,"approve",yes)},"teal");
+  var no=button("Decline",function(){ownerDecision(a,"decline",no)});
   actions.appendChild(yes);actions.appendChild(no);
- }else if(a.status==="approved")actions.appendChild(button("Copy invitation",function(){copyInvitation(a)}));
+ }else if(a.status==="declined"){
+  var reconsider=button("Return to pending",function(){ownerDecision(a,"reconsider",reconsider)},"teal");
+  var edit=button(a.decline_reason?"Edit reason":"Add reason",function(){ownerDecision(a,"save_decline_reason",edit)});
+  actions.appendChild(reconsider);actions.appendChild(edit);
+ }else if(a.status==="approved"){
+  actions.appendChild(button("Copy invitation",function(){copyInvitation(a)}));
+ }
+ var clear=button("Clear",function(){ownerDecision(a,"clear",clear)});
+ clear.setAttribute("aria-label","Clear application for "+a.company_name);
+ actions.appendChild(clear);
  item.appendChild(info);item.appendChild(actions);area.appendChild(item);
  });
 }

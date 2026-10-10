@@ -782,6 +782,10 @@ function renderFleet(d){
 function showDeviceUpdate(device,driver){
   var area=document.getElementById("updateQrArea"),heading=document.getElementById("updateQrHeading");
   area.classList.remove("hidden");heading.textContent=reportT("Update QR")+": "+driver;
+  area.scrollIntoView({behavior:"smooth",block:"nearest"});
+  ["shareDriverUpdate","copyDriverUpdate","downloadDriverUpdateQr"].forEach(function(id){
+    document.getElementById(id).disabled=!latestPilotRelease;
+  });
   var desc=document.getElementById("updateQrText"),svg=document.getElementById("updateQrSvg"),link=document.getElementById("updateDownloadLink");
   if(!latestPilotRelease){
     desc.textContent=reportT("No approved pilot APK yet.");

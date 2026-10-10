@@ -54,7 +54,9 @@ for (const policy of ["Recommended", "Strict"])
     "fleet policy values must remain untranslated: " + policy);
 assert.ok(html.indexOf("portal-translations.js") < html.indexOf("portal-explanations.js"));
 assert.ok(html.indexOf("portal-explanations.js") < html.indexOf("portal-i18n.js"));
-assert.ok(html.includes("ROAD1ST_PORTAL_LANGUAGE.translate(\"Revoke this phone from the fleet?\")"), "revocation confirmation is translated");
+assert.ok(html.includes('confirmRoad1st("Revoke this phone from the fleet?"'), "branded revocation uses translated confirmation");
+assert.ok(html.includes('id="road1stConfirm"'), "ROAD 1ST confirmation box present");
+assert.ok(!/\bconfirm\(/.test(html), "native browser confirmations replaced");
 assert.ok(html.includes('reportT("No reports in this category.")'), "report empty state translated");
 assert.ok(html.includes('return reportT(m[e]||words(e))'), "event code mapped to translated label");
 assert.ok(html.includes('return reportT(m[v]||words(v))'), "control code mapped to translated label");

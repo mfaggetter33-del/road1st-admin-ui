@@ -1,0 +1,19 @@
+{
+  "id": "./owner.html",
+  "name": "ROAD 1ST Owner",
+  "short_name": "ROAD 1ST Owner",
+  "description": "Private ROAD 1ST business owner dashboard for fleet companies and applications",
+  "start_url": "./owner.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "icons": [
+    {
+      "src": "road1st-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

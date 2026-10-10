@@ -453,6 +453,16 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
 </div>
 <div id="qrArea" class="hidden"><div id="qrMeta" class="note"></div><div id="qrSvg" class="qrbox"></div></div>
+
+<div class="reviewlist" id="websiteQrTest">
+  <strong>Website QR test — no app needed</strong>
+  <div class="note">Test the first-time phone scan. This code opens the ROAD 1ST website only; it does not enrol a driver or use a fleet token.</div>
+  <div class="compliance-actions"><button id="showWebsiteQr" class="secondary" type="button">Show website test QR</button></div>
+  <div id="websiteQrArea" class="hidden">
+    <div id="websiteQrSvg" class="qrbox"></div>
+    <div class="note" style="text-align:center">Opens <a href="https://r1st.ie/" target="_blank" rel="noopener noreferrer">https://r1st.ie/</a> in the phone browser.</div>
+  </div>
+</div>
 <div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
 <div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
 </section>
@@ -701,6 +711,25 @@ async function counts(){await Promise.all(["reports","fuel","defects"].map(async
 async function show(){login.classList.add("hidden");dash.classList.remove("hidden");var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
 document.getElementById("saveCompliance").onclick=saveCompliance;
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
+
+(function(){
+  var qrRows=["1111111011000110101111111","1000001001000111001000001","1011101001001010001011101","1011101010111000101011101","1011101011010000001011101","1000001010011000101000001","1111111010101010101111111","0000000011100100000000000","1000101110010101011111001","1100110110111111010111010","0010001000101001010011100","0100010111110011000000110","1101001000110110011001111","1111100100001001110010010","0001011010111111010111100","0000000111010101101110110","1110101011101101111111100","0000000011000110100010000","1111111010000000101010000","1000001001101010100011110","1011101010110110111111101","1011101000101000111100111","1011101000011110001001010","1000001001010101000111110","1111111010001100001000111"];
+  var path="";
+  qrRows.forEach(function(row,y){
+    for(var x=0;x<25;){
+      if(row.charAt(x)!=="1"){x++;continue;}
+      var start=x;
+      while(x<25 && row.charAt(x)==="1")x++;
+      path+="M"+(start+4)+" "+(y+4)+"h"+(x-start)+"v1h-"+(x-start)+"z";
+    }
+  });
+  document.getElementById("websiteQrSvg").innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" role="img" aria-label="ROAD 1ST website test QR code"><rect width="33" height="33" fill="#fff"/><path d="'+path+'" fill="#000"/></svg>';
+  document.getElementById("showWebsiteQr").onclick=function(){
+    var area=document.getElementById("websiteQrArea");
+    area.classList.toggle("hidden");
+    this.textContent=area.classList.contains("hidden")?"Show website test QR":"Hide website test QR";
+  };
+})();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("fleetSelect").onchange=function(){
   document.getElementById("qrArea").classList.add("hidden");

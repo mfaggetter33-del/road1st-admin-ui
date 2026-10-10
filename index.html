@@ -456,6 +456,15 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   <div style="align-self:end"><button id="saveWalkaroundRequirement" class="secondary full" type="button">Save walkaround policy</button></div>
 </div>
 <div class="note">Applies to professional drivers only. The first driver is prompted; co-drivers do not repeat the inspection. Changes reach fleet phones when they refresh.</div>
+<div class="reviewlist" id="fleetFuelCardSettings">
+  <strong>Fleet fuel cards</strong>
+  <div class="note">Enter the fuel card providers this fleet uses. Only active providers appear in drivers' Fuel Receipt dropdowns. Do not enter card numbers or PINs.</div>
+  <div class="fleetgrid">
+    <div><label for="newFuelCardName">Fuel card provider</label><input id="newFuelCardName" maxlength="80" placeholder="e.g. DKV, Circle K"></div>
+    <div style="align-self:end"><button id="addFleetFuelCard" class="secondary full" type="button">Add fuel card</button></div>
+  </div>
+  <div id="fleetFuelCardList" class="note">No fuel cards configured.</div>
+</div>
 <div class="fleetgrid">
 <div><label>Driver name</label><input id="newDriverName" placeholder="Driver name"></div>
 <div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
@@ -748,6 +757,18 @@ function renderFleet(d){
   fleets.forEach(function(f){var o=document.createElement("option");o.value=f.id;o.textContent=f.name;if(current&&f.id===current.id)o.selected=true;sel.appendChild(o)});
   document.getElementById("fleetPreset").value=current&&current.blocking_preset?current.blocking_preset:"Recommended";
   document.getElementById("fleetWalkaroundRequired").value=current&&current.walkaround_required===true?"true":"false";
+  var fuelList=document.getElementById("fleetFuelCardList");
+  fuelList.textContent="";
+  var cards=(d.fuel_cards||[]).filter(function(c){return c.active});
+  if(!cards.length)fuelList.textContent=reportT("No fuel cards configured.");
+  cards.forEach(function(card){
+    var line=document.createElement("div");line.className="device";
+    var name=document.createElement("strong");name.textContent=card.label;
+    var archive=document.createElement("button");archive.type="button";archive.className="secondary";
+    archive.textContent=reportT("Archive");
+    archive.onclick=function(){archiveFleetFuelCard(card.id,card.label)};
+    line.appendChild(name);line.appendChild(archive);fuelList.appendChild(line);
+  });
   var drivers={};(d.drivers||[]).forEach(function(x){drivers[x.id]=x.display_name});
   var list=document.getElementById("deviceList"),devices=d.devices||[];
   list.textContent="";
@@ -885,8 +906,33 @@ async function saveWalkaroundRequirement(){
   }catch(e){status.textContent=e.message||"Could not save walkaround policy."}
   finally{button.disabled=false}
 }
+async function addFleetFuelCard(){
+  var fleetId=document.getElementById("fleetSelect").value,
+      field=document.getElementById("newFuelCardName"),
+      name=field.value.trim(),button=document.getElementById("addFleetFuelCard");
+  if(!name){status.textContent=reportT("Enter a fuel card provider.");return}
+  button.disabled=true;
+  try{
+    await api(F,{method:"POST",body:JSON.stringify({action:"add_fuel_card",fleet_id:fleetId,label:name})});
+    field.value="";
+    await loadFleet(fleetId);
+    status.textContent=reportT("Fuel card added. Driver phones receive the choices when they refresh.");
+  }catch(e){status.textContent=e.message||"Could not add fuel card."}
+  finally{button.disabled=false}
+}
+async function archiveFleetFuelCard(cardId,name){
+  var fleetId=document.getElementById("fleetSelect").value;
+  if(!confirm(reportT("Archive fuel card")+": "+name+"?"))return;
+  try{
+    await api(F,{method:"POST",body:JSON.stringify({
+      action:"archive_fuel_card",fleet_id:fleetId,fuel_card_id:cardId
+    })});
+    await loadFleet(fleetId);
+    status.textContent=reportT("Fuel card archived. Existing receipts remain unchanged.");
+  }catch(e){status.textContent=e.message||"Could not archive fuel card."}
+}
 async function revokeFleetDevice(deviceId){var fleetId=document.getElementById("fleetSelect").value;if(!confirm(window.ROAD1ST_PORTAL_LANGUAGE?window.ROAD1ST_PORTAL_LANGUAGE.translate("Revoke this phone from the fleet?"):"Revoke this phone from the fleet?"))return;try{await api(F,{method:"POST",body:JSON.stringify({action:"revoke_device",fleet_id:fleetId,device_id:deviceId})});status.textContent="Phone revoked.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not revoke phone."}}
-function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","App","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.app_version);previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
+function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","Fuel Card","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.fuel_card||"—");previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
 async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value);try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent=reportT("Reports")+": "+reportItems.length+" / "+reportTotal+" · "+reportT("Category");return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent=reportT(k==="fuel"?"Fuel receipts":"Defect photos")+": "+(d.items||[]).length+" / "+d.total}
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}
 async function show(){login.classList.add("hidden");dash.classList.remove("hidden");var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
@@ -1016,6 +1062,7 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
   };
 })();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
+document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
 document.getElementById("fleetSelect").onchange=function(){
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("updateQrArea").classList.add("hidden");

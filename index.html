@@ -1075,6 +1075,88 @@ document.addEventListener("road1st-portal-language-change",function(){
   if(C==="journeys"&&journeysItems.length)renderJourneys();
 });
 
+
+var customerApplications=[];
+function customerWelcome(app){
+  return "ROAD 1ST Fleet - Account approved\n\n"+
+    "Hello "+app.contact_name+",\n\n"+
+    "Your company, "+app.company_name+", is approved for ROAD 1ST Fleet.\n\n"+
+    "Open https://mfaggetter33-del.github.io/road1st-admin-ui/\n"+
+    "Select First time? Create account and use this exact email: "+app.contact_email+"\n"+
+    "Choose a password, verify your email, and then sign in.\n"+
+    "Your private fleet will appear automatically.\n\n"+
+    "No payment has been set up.\n\nROAD 1ST";
+}
+async function loadApplications(){
+  var summary=document.getElementById("applicationsSummary");
+  summary.textContent=reportT("Searching…");
+  try{
+    var data=await api(O+"?kind=applications");
+    customerApplications=data.applications||[];
+    renderApplications();
+    summary.textContent=customerApplications.filter(function(x){return x.status==="pending"}).length+
+      " "+reportT("Pending")+" · "+customerApplications.length+" "+reportT("Fleet applications");
+  }catch(e){summary.textContent=e.message||"Could not load applications.";
+    document.getElementById("applicationsList").textContent=""}
+}
+function renderApplications(){
+  var area=document.getElementById("applicationsList");area.textContent="";
+  if(!customerApplications.length){area.textContent=reportT("No applications yet.");return;}
+  customerApplications.forEach(function(app){
+    var item=document.createElement("div");item.className="reviewitem";
+    var heading=document.createElement("strong");heading.textContent=app.company_name;
+    var details=document.createElement("div");details.className="sub";
+    details.textContent=app.contact_name+" · "+app.contact_email+
+      (app.phone?" · "+app.phone:"")+
+      (app.expected_vehicles?" · "+app.expected_vehicles+" "+reportT("vehicles"):"");
+    var sub=document.createElement("div");sub.className="sub";
+    sub.textContent=reportT(app.status==="pending"?"Pending":app.status==="approved"?"Approved":"Declined")+
+      " · "+date(app.submitted_at);
+    item.appendChild(heading);item.appendChild(details);item.appendChild(sub);
+    var actions=document.createElement("div");actions.className="compliance-actions";
+    if(app.status==="pending"){
+      var approve=document.createElement("button");approve.type="button";
+      approve.className="teal";approve.textContent=reportT("Approve");
+      approve.onclick=async function(){
+        var ok=await confirmRoad1st("Approve","Approve this company and create its private fleet?","Approve");
+        if(!ok)return;
+        approve.disabled=true;
+        try{
+          await api(O,{method:"POST",body:JSON.stringify({action:"approve",application_id:app.id})});
+          status.textContent=reportT("Approved")+". "+reportT("Copy invitation");
+          await loadApplications();
+          try{fleetData=await api(F)}catch(e){}
+        }catch(e){status.textContent=e.message||"Approval failed.";approve.disabled=false}
+      };
+      actions.appendChild(approve);
+      var decline=document.createElement("button");decline.type="button";
+      decline.className="secondary";decline.textContent=reportT("Decline");
+      decline.onclick=async function(){
+        var ok=await confirmRoad1st("Decline","Decline this fleet application? No account will be activated.","Decline");
+        if(!ok)return;
+        decline.disabled=true;
+        try{
+          await api(O,{method:"POST",body:JSON.stringify({action:"decline",application_id:app.id})});
+          status.textContent=reportT("Declined");await loadApplications();
+        }catch(e){status.textContent=e.message||"Decline failed.";decline.disabled=false}
+      };
+      actions.appendChild(decline);
+    }
+    if(app.status==="approved"){
+      var copy=document.createElement("button");copy.type="button";copy.className="secondary";
+      copy.textContent=reportT("Copy invitation");
+      copy.onclick=async function(){
+        var message=customerWelcome(app);
+        try{await navigator.clipboard.writeText(message);status.textContent=reportT("Invitation copied")}
+        catch(e){window.prompt("Copy invitation",message)}
+      };
+      actions.appendChild(copy);
+    }
+    item.appendChild(actions);area.appendChild(item);
+  });
+}
+document.getElementById("refreshApplications").onclick=loadApplications;
+
 function val(id,v){document.getElementById(id).value=v||""}
 function renderCompliance(d){var p=d.profile||{};val("organisationName",p.organisation_name||"ROAD 1ST");val("ownerName",p.owner_name);val("ownerEmail",p.owner_email);val("ownerPhone",p.owner_phone);val("complianceName",p.compliance_contact_name);val("complianceEmail",p.compliance_contact_email);val("technicalName",p.technical_contact_name);val("technicalEmail",p.technical_contact_email);val("privacyEmail",p.privacy_contact_email);val("playEmail",p.play_console_contact_email);val("complianceNotes",p.notes);document.getElementById("routeAll").checked=p.route_all_notifications_to_owner!==false;document.getElementById("complianceMeta").textContent=p.updated_at?"Last updated "+date(p.updated_at)+".":"";var list=document.getElementById("reviewList"),reviews=d.reviews||[];list.textContent="";if(!reviews.length){list.textContent="No reviews recorded yet.";return}reviews.forEach(function(r){var x=document.createElement("div");x.className="reviewitem";var b=document.createElement("b");b.textContent=(r.review_type||"Compliance review")+" · "+String(r.status||"").replace(/_/g," ");var s=document.createElement("div");s.textContent=r.summary||"";var m=document.createElement("div");m.className="sub";m.textContent=date(r.reviewed_at)+(r.due_at?" · Due "+date(r.due_at):"");x.appendChild(b);x.appendChild(s);x.appendChild(m);list.appendChild(x)})}
 async function saveCompliance(){var b=document.getElementById("saveCompliance");b.disabled=true;status.textContent="Saving ownership and compliance contacts…";try{var payload={action:"update_compliance",organisation_name:document.getElementById("organisationName").value,owner_name:document.getElementById("ownerName").value,owner_email:document.getElementById("ownerEmail").value,owner_phone:document.getElementById("ownerPhone").value,compliance_contact_name:document.getElementById("complianceName").value,compliance_contact_email:document.getElementById("complianceEmail").value,technical_contact_name:document.getElementById("technicalName").value,technical_contact_email:document.getElementById("technicalEmail").value,privacy_contact_email:document.getElementById("privacyEmail").value,play_console_contact_email:document.getElementById("playEmail").value,route_all_notifications_to_owner:document.getElementById("routeAll").checked,notes:document.getElementById("complianceNotes").value};var d=await api(A,{method:"POST",body:JSON.stringify(payload)});renderCompliance({profile:d.profile,reviews:[]});status.textContent="Ownership and compliance contacts saved."}catch(e){status.textContent=e.message||"Could not save contacts."}finally{b.disabled=false}}

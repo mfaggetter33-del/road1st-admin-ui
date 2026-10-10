@@ -84,13 +84,17 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <h1>Owner overview</h1>
 <p class="sub">Your ROAD 1ST company accounts and requests to join. Driver reports stay in the separate Fleet Portal.</p>
 <div class="cards">
-<div class="card"><b id="companyCount">—</b><span>Registered fleet companies</span></div>
-<div class="card"><b id="activeCount">—</b><span>Active fleet records</span></div>
+<div class="card"><b id="companyCount">—</b><span>Customer company accounts</span></div>
+<div class="card"><b id="activeCount">—</b><span>Internal pilot fleets</span></div>
 <div class="card"><b id="pendingCount">—</b><span>Applications awaiting review</span></div>
 </div>
 <div class="panel">
-<div class="panel-head"><div><h2>Companies</h2><p class="sub">Registered fleets, including testing accounts. An active fleet is not necessarily a paying customer.</p></div><button type="button" id="refresh">Refresh</button></div>
+<div class="panel-head"><div><h2>Customer companies</h2><p class="sub">Registered customer fleet accounts. A registered fleet is not necessarily a paying customer.</p></div><button type="button" id="refresh">Refresh</button></div>
 <div id="companies" class="rows" aria-live="polite"></div>
+</div>
+<div class="panel">
+<div class="panel-head"><div><h2>Internal testing fleets</h2><p class="sub">Our own ROAD 1ST pilot fleet is not a customer company.</p></div></div>
+<div id="pilotFleets" class="rows" aria-live="polite"></div>
 </div>
 <div id="companyDetail" class="panel hidden">
 <div class="panel-head"><h2 id="detailName">Company</h2><button id="closeDetail" type="button">Close</button></div>
@@ -102,6 +106,26 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an invitation.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
 <div id="applications" class="rows" aria-live="polite"></div>
 </div>
+<section class="panel" id="ownershipCompliance">
+<div class="panel-head"><div><h2>Ownership &amp; compliance</h2><p class="sub">Business ownership, contacts and review history. Owner-only information; not part of any fleet account.</p></div><button id="refreshCompliance" type="button">Refresh compliance</button></div>
+<div class="details" style="gap:12px 18px">
+<div><label for="organisationName">Organisation</label><input id="organisationName" autocomplete="organization"></div>
+<div><label for="ownerName">Owner / primary contact</label><input id="ownerName" autocomplete="name"></div>
+<div><label for="ownerEmail">Owner email</label><input id="ownerEmail" type="email" autocomplete="email"></div>
+<div><label for="ownerPhone">Owner phone</label><input id="ownerPhone" autocomplete="tel"></div>
+<div><label for="complianceName">Compliance contact</label><input id="complianceName"></div>
+<div><label for="complianceEmail">Compliance email</label><input id="complianceEmail" type="email"></div>
+<div><label for="technicalName">Technical contact</label><input id="technicalName"></div>
+<div><label for="technicalEmail">Technical email</label><input id="technicalEmail" type="email"></div>
+<div><label for="privacyEmail">Privacy contact email</label><input id="privacyEmail" type="email"></div>
+<div><label for="playEmail">Google Play contact email</label><input id="playEmail" type="email"></div>
+</div>
+<label style="display:flex;align-items:center;gap:10px"><input id="routeAll" type="checkbox" checked style="width:18px;height:18px;flex:0 0 18px">Route ROAD 1ST operational and compliance notifications to the owner unless a specialist contact is set</label>
+<div style="margin-top:14px"><label for="complianceNotes">Handover / compliance notes</label><input id="complianceNotes"></div>
+<div class="row-actions" style="margin-top:14px"><button id="saveCompliance" class="teal" type="button">Save contacts</button></div>
+<p id="complianceMeta" class="notice" role="status"></p>
+<h2 style="margin-top:18px">Compliance review history</h2><div id="reviewList" class="rows"></div>
+</section>
 <p id="status" class="notice" role="status" aria-live="polite"></p>
 </section>
 </main>
@@ -110,7 +134,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 (function(){"use strict";
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",
  K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",
- O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",
+ O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",
  S=null, fleets=[], applications=[];
 var el=function(id){return document.getElementById(id)};
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
@@ -138,26 +162,33 @@ async function api(url,option){
  return d;
 }
 function ownerVisible(yes){el("dashboard").classList.toggle("hidden",!yes);el("login").classList.toggle("hidden",yes);el("logout").classList.toggle("hidden",!yes)}
-function renderCompanies(){
- var area=el("companies");area.textContent="";
- el("companyCount").textContent=fleets.length;
- el("activeCount").textContent=fleets.filter(function(x){return x.status==="active"}).length;
- if(!fleets.length){area.appendChild(txt("p","No registered companies yet.","empty"));return}
- fleets.forEach(function(f){
+function isPilot(f){return /^ROAD\\s*1ST\\s*Pilot\\s*Fleet$/i.test(String(f.name||""))}
+function addFleetRow(area,f,pilot){
  var item=document.createElement("div");item.className="company";
  var info=document.createElement("div"),head=document.createElement("div");
  head.appendChild(txt("strong",f.name));
- head.appendChild(txt("span",f.status||"Unknown","pill"+(f.status==="active"?"":" pending")));
- info.appendChild(head);rowMeta(info,"Registered "+date(f.created_at));
+ head.appendChild(txt("span",pilot?"Internal testing":(f.status||"Unknown"),"pill"+(pilot?" pending":"")));
+ info.appendChild(head);
+ rowMeta(info,(pilot?"Pilot fleet · ":"Registered fleet · ")+date(f.created_at));
  var actions=document.createElement("div");actions.className="row-actions";
- actions.appendChild(button("View company",function(){showCompany(f)}));
+ actions.appendChild(button("View "+(pilot?"pilot":"company"),function(){showCompany(f)}));
  item.appendChild(info);item.appendChild(actions);area.appendChild(item);
- });
+}
+function renderCompanies(){
+ var area=el("companies"),pilotArea=el("pilotFleets");area.textContent="";pilotArea.textContent="";
+ var pilots=fleets.filter(isPilot),customers=fleets.filter(function(f){return !isPilot(f)});
+ el("companyCount").textContent=customers.length;
+ el("activeCount").textContent=pilots.length;
+ if(!customers.length)area.appendChild(txt("p","No customer fleet accounts yet.","empty"));
+ customers.forEach(function(f){addFleetRow(area,f,false)});
+ if(!pilots.length)pilotArea.appendChild(txt("p","No internal testing fleets.","empty"));
+ pilots.forEach(function(f){addFleetRow(pilotArea,f,true)});
 }
 function showCompany(f){
  var match=applications.find(function(a){return a.fleet_id===f.id&&a.status==="approved"});
  el("detailName").textContent=f.name;
  var area=el("detailFields");area.textContent="";
+ putDetail(area,"Account type",isPilot(f)?"Internal pilot (not a customer)":"Customer or other registered fleet");
  putDetail(area,"Fleet status",f.status||"Unknown");
  putDetail(area,"Registered",date(f.created_at));
  putDetail(area,"Contact",match?match.contact_name:"Not recorded in application");
@@ -204,6 +235,39 @@ function renderApplications(){
  item.appendChild(info);item.appendChild(actions);area.appendChild(item);
  });
 }
+function complianceValue(id,value){el(id).value=value==null?"":String(value)}
+function renderCompliance(data){
+ var p=data.profile||{};
+ var fields={organisationName:p.organisation_name||"ROAD 1ST",ownerName:p.owner_name,ownerEmail:p.owner_email,ownerPhone:p.owner_phone,complianceName:p.compliance_contact_name,complianceEmail:p.compliance_contact_email,technicalName:p.technical_contact_name,technicalEmail:p.technical_contact_email,privacyEmail:p.privacy_contact_email,playEmail:p.play_console_contact_email,complianceNotes:p.notes};
+ Object.keys(fields).forEach(function(id){complianceValue(id,fields[id])});
+ el("routeAll").checked=p.route_all_notifications_to_owner!==false;
+ el("complianceMeta").textContent=p.updated_at?"Last updated "+date(p.updated_at):"";
+ var out=el("reviewList");out.textContent="";
+ var reviews=data.reviews||[];
+ if(!reviews.length){out.appendChild(txt("p","No reviews recorded yet.","empty"));return}
+ reviews.forEach(function(r){
+  var entry=document.createElement("div");entry.className="company";
+  var box=document.createElement("div");
+  box.appendChild(txt("strong",(r.review_type||"Compliance review")+" · "+(r.status||"")));
+  rowMeta(box,[date(r.reviewed_at||r.created_at),r.summary].filter(Boolean).join(" · "));
+  entry.appendChild(box);out.appendChild(entry);
+ });
+}
+async function loadCompliance(){
+ el("complianceMeta").textContent="Loading compliance information…";
+ try{renderCompliance(await api(A+"?kind=compliance"))}
+ catch(e){el("complianceMeta").textContent="Compliance could not load: "+e.message}
+}
+async function saveCompliance(){
+ var b=el("saveCompliance");b.disabled=true;el("complianceMeta").textContent="Saving…";
+ try{
+  var values={action:"update_compliance",organisation_name:el("organisationName").value,owner_name:el("ownerName").value,owner_email:el("ownerEmail").value,owner_phone:el("ownerPhone").value,compliance_contact_name:el("complianceName").value,compliance_contact_email:el("complianceEmail").value,technical_contact_name:el("technicalName").value,technical_contact_email:el("technicalEmail").value,privacy_contact_email:el("privacyEmail").value,play_console_contact_email:el("playEmail").value,route_all_notifications_to_owner:el("routeAll").checked,notes:el("complianceNotes").value};
+  await api(A,{method:"POST",body:JSON.stringify(values)});
+  await loadCompliance();
+  el("complianceMeta").textContent="Ownership and compliance contacts saved.";
+ }catch(e){el("complianceMeta").textContent="Could not save contacts: "+e.message}
+ finally{b.disabled=false}
+}
 async function refresh(){
  status("Loading companies and applications…");
  try{
@@ -215,6 +279,7 @@ async function refresh(){
   ownerVisible(true);renderCompanies();renderApplications();
   var shown=el("companyDetail");if(!shown.classList.contains("hidden"))shown.classList.add("hidden");
   status("Owner records updated.");
+  await loadCompliance();
  }catch(e){ownerVisible(false);el("loginError").textContent=e.message;status("");throw e}
 }
 async function signin(e){
@@ -230,6 +295,8 @@ async function signin(e){
 }
 el("loginForm").addEventListener("submit",signin);
 el("refresh").onclick=function(){refresh().catch(function(){})};
+el("refreshCompliance").onclick=function(){loadCompliance()};
+el("saveCompliance").onclick=saveCompliance;
 el("closeDetail").onclick=function(){el("companyDetail").classList.add("hidden")};
 el("logout").onclick=function(){S=null;sessionStorage.removeItem("r1a");location.reload()};
 if(S)refresh().catch(function(){});

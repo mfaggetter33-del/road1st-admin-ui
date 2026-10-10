@@ -449,6 +449,14 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 </div>
 <div class="compliance-actions"><button id="saveFleetPreset" class="secondary">Save fleet policy</button></div>
 <div class="fleetgrid">
+  <div><label>Fleet walkaround policy</label><select id="fleetWalkaroundRequired">
+    <option value="false">Driver choice (prompt and record)</option>
+    <option value="true">Mandatory before journey</option>
+  </select></div>
+  <div style="align-self:end"><button id="saveWalkaroundRequirement" class="secondary full" type="button">Save walkaround policy</button></div>
+</div>
+<div class="note">Applies to professional drivers only. The first driver is prompted; co-drivers do not repeat the inspection. Changes reach fleet phones when they refresh.</div>
+<div class="fleetgrid">
 <div><label>Driver name</label><input id="newDriverName" placeholder="Driver name"></div>
 <div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
 </div>
@@ -739,6 +747,7 @@ function renderFleet(d){
   sel.textContent="";
   fleets.forEach(function(f){var o=document.createElement("option");o.value=f.id;o.textContent=f.name;if(current&&f.id===current.id)o.selected=true;sel.appendChild(o)});
   document.getElementById("fleetPreset").value=current&&current.blocking_preset?current.blocking_preset:"Recommended";
+  document.getElementById("fleetWalkaroundRequired").value=current&&current.walkaround_required===true?"true":"false";
   var drivers={};(d.drivers||[]).forEach(function(x){drivers[x.id]=x.display_name});
   var list=document.getElementById("deviceList"),devices=d.devices||[];
   list.textContent="";
@@ -862,6 +871,20 @@ function downloadDriverUpdateQr(){
 async function loadFleet(fleetId){var url=F+(fleetId?"?fleet_id="+encodeURIComponent(fleetId):"");var d=await api(url);renderFleet(d);return d}
 async function createFleetEnrolment(){var name=document.getElementById("newDriverName").value.trim(),fleetId=document.getElementById("fleetSelect").value,b=document.getElementById("createEnrolment");if(!name){status.textContent="Enter the driver name.";return}b.disabled=true;status.textContent="Creating one-time enrolment QR…";try{var d=await api(F,{method:"POST",body:JSON.stringify({action:"create_enrolment",fleet_id:fleetId,driver_name:name})});var area=document.getElementById("qrArea"),svg=document.getElementById("qrSvg");if(typeof d.qr_svg!=="string"||d.qr_svg.indexOf("<svg")<0)throw Error("QR could not be generated.");svg.innerHTML=d.qr_svg;document.getElementById("qrMeta").textContent=(d.driver&&d.driver.display_name?d.driver.display_name:"Driver")+" · expires "+date(d.expires_at)+" · single use";area.classList.remove("hidden");document.getElementById("newDriverName").value="";status.textContent="QR ready. Scan it with the phone being enrolled.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not create enrolment."}finally{b.disabled=false}}
 async function saveFleetPolicy(){var fleetId=document.getElementById("fleetSelect").value,preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");b.disabled=true;try{await api(F,{method:"POST",body:JSON.stringify({action:"set_fleet_preset",fleet_id:fleetId,blocking_preset:preset})});status.textContent="Fleet policy saved. Enrolled phones pick it up automatically.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not save fleet policy."}finally{b.disabled=false}}
+async function saveWalkaroundRequirement(){
+  var fleetId=document.getElementById("fleetSelect").value,
+      required=document.getElementById("fleetWalkaroundRequired").value==="true",
+      button=document.getElementById("saveWalkaroundRequirement");
+  button.disabled=true;
+  try{
+    await api(F,{method:"POST",body:JSON.stringify({
+      action:"set_walkaround_requirement",fleet_id:fleetId,walkaround_required:required
+    })});
+    status.textContent=reportT("Walkaround policy saved. Fleet phones will pick it up.");
+    await loadFleet(fleetId);
+  }catch(e){status.textContent=e.message||"Could not save walkaround policy."}
+  finally{button.disabled=false}
+}
 async function revokeFleetDevice(deviceId){var fleetId=document.getElementById("fleetSelect").value;if(!confirm(window.ROAD1ST_PORTAL_LANGUAGE?window.ROAD1ST_PORTAL_LANGUAGE.translate("Revoke this phone from the fleet?"):"Revoke this phone from the fleet?"))return;try{await api(F,{method:"POST",body:JSON.stringify({action:"revoke_device",fleet_id:fleetId,device_id:deviceId})});status.textContent="Phone revoked.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not revoke phone."}}
 function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres","App","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.app_version);previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
 async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value);try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent=reportT("Reports")+": "+reportItems.length+" / "+reportTotal+" · "+reportT("Category");return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent=reportT(k==="fuel"?"Fuel receipts":"Defect photos")+": "+(d.items||[]).length+" / "+d.total}
@@ -882,6 +905,7 @@ document.getElementById("pilotApkFile").onchange=function(){
          document.getElementById("pilotVersionCode").value=m[2];}
 };
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
+document.getElementById("saveWalkaroundRequirement").onclick=saveWalkaroundRequirement;
 document.getElementById("closeEnrolmentQr").onclick=function(){document.getElementById("qrArea").classList.add("hidden");document.getElementById("qrSvg").textContent="";document.getElementById("qrMeta").textContent="";};
 
 (function(){

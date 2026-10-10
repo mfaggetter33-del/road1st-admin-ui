@@ -810,7 +810,7 @@ async function refreshLatestPilot(){
 }
 function pilotPublishMessage(message){
   document.getElementById("pilotPublishStatus").textContent=message;
-  pilotPublishMessage(message);
+  status.textContent=message;
 }
 async function publishPilotApk(){
   var input=document.getElementById("pilotApkFile"),file=input.files&&input.files[0],
@@ -835,7 +835,7 @@ async function publishPilotApk(){
     input.value="";
     await refreshLatestPilot();
     pilotPublishMessage(reportT("Published")+": "+name);
-  }catch(e){status.textContent=e.message||"Upload failed"}finally{button.disabled=false}
+  }catch(e){pilotPublishMessage(e.message||"Upload failed")}finally{button.disabled=false}
 }
 async function copyDriverUpdateLink(){
   if(!latestPilotRelease)return;

@@ -452,7 +452,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div><label>Driver name</label><input id="newDriverName" placeholder="Driver name"></div>
 <div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
 </div>
-<div id="qrArea" class="hidden"><div id="qrMeta" class="note"></div><div id="qrSvg" class="qrbox"></div></div>
+<div id="qrArea" class="hidden"><div id="qrMeta" class="note"></div><div id="qrSvg" class="qrbox"></div><div class="compliance-actions" style="justify-content:flex-end"><button id="closeEnrolmentQr" class="secondary" type="button">Close</button></div></div>
 
 <div class="reviewlist" id="websiteQrTest">
   <div class="compliance-actions"><button id="showWebsiteQr" class="secondary" type="button" aria-expanded="false">Website QR test</button></div>
@@ -706,6 +706,7 @@ async function counts(){await Promise.all(["reports","fuel","defects"].map(async
 async function show(){login.classList.add("hidden");dash.classList.remove("hidden");var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
 document.getElementById("saveCompliance").onclick=saveCompliance;
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
+document.getElementById("closeEnrolmentQr").onclick=function(){document.getElementById("qrArea").classList.add("hidden");document.getElementById("qrSvg").textContent="";document.getElementById("qrMeta").textContent="";};
 
 (function(){
   var qrRows=["1111111011000110101111111","1000001001000111001000001","1011101001001010001011101","1011101010111000101011101","1011101011010000001011101","1000001010011000101000001","1111111010101010101111111","0000000011100100000000000","1000101110010101011111001","1100110110111111010111010","0010001000101001010011100","0100010111110011000000110","1101001000110110011001111","1111100100001001110010010","0001011010111111010111100","0000000111010101101110110","1110101011101101111111100","0000000011000110100010000","1111111010000000101010000","1000001001101010100011110","1011101010110110111111101","1011101000101000111100111","1011101000011110001001010","1000001001010101000111110","1111111010001100001000111"];

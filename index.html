@@ -867,7 +867,7 @@ document.getElementById("closeDriverUpdateQr").onclick=function(){
   document.getElementById("updateQrArea").classList.add("hidden");
 };
 document.getElementById("pilotApkFile").onchange=function(){
-  var name=this.files&&this.files[0]&&this.files[0].name||"",m=/^ROAD1ST-(\\d+)\\.(\\d+)-pilot\\.apk$/i.exec(name);
+  var name=this.files&&this.files[0]&&this.files[0].name||"",m=/^ROAD1ST-(\d+)\.(\d+)-pilot\.apk$/i.exec(name);
   if(m){document.getElementById("pilotVersionName").value=m[1]+"."+m[2]+"-pilot";
          document.getElementById("pilotVersionCode").value=m[2];}
 };

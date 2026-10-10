@@ -71,7 +71,7 @@ const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="porta
   .replace(/&amp;/g, "&")
   .split("|").map(x => x.trim()).filter(x => x.length > 1);
 const coverage = new Set(data.keys.concat(data.more.keys, data.report.keys, data.messages.keys, data.events.keys, data.generatedReports.keys, data.timeline.keys, [
-  "ROAD 1ST ADMIN", "ROAD 1ST Server", "QR"
+  "ROAD 1ST ADMIN", "ROAD 1ST Server", "ROAD 1ST", "QR"
 ]));
 const missing = [...new Set(text)].filter(x => !coverage.has(x));
 assert.deepEqual(missing, [], "untranslated static portal labels");

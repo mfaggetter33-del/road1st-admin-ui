@@ -44,7 +44,7 @@ main{padding:8px 0 50px}
 .rows{display:grid;gap:10px}
 .company,.application{border:1px solid var(--line);background:#0c131e;border-radius:12px;padding:15px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .company strong,.application strong{display:block;font-size:17px}
-.meta{color:var(--muted);font-size:13px}
+.meta{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
 .pill{border:1px solid #476153;color:#b6efcf;background:#173b2b;display:inline-block;font-size:12px;border-radius:99px;padding:2px 10px}
 .pill.pending{background:#39301c;border-color:#876d3e;color:#f3db94}
 .pill.declined{background:#3b2028;border-color:#97475e;color:#ffbfcb}
@@ -248,7 +248,7 @@ function renderApplications(){
  rowMeta(info,"Received "+date(a.submitted_at)+(a.expected_vehicles?" · "+a.expected_vehicles+" expected vehicles":""));
  var statusLabel=a.status==="pending"?"Pending":a.status==="approved"?"Approved":"Declined";
  info.appendChild(txt("span",statusLabel,"pill "+(a.status||"pending")));
- if(a.status==="declined")rowMeta(info,"Reason: "+(a.decline_reason||"Not recorded yet"));
+ if(a.status==="declined")info.appendChild(txt("span"," · Reason: "+(a.decline_reason||"Not recorded yet"),"meta"));
  else if(a.decline_reason)rowMeta(info,"Previous decline reason: "+a.decline_reason);
  var actions=document.createElement("div");actions.className="row-actions";
  if(a.status==="pending"){

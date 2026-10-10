@@ -435,7 +435,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 </section>
 <main id="dash" class="hidden">
 <div class="toolbar"><div><strong id="title">Reports</strong><div class="sub">Private ROAD 1ST server records</div></div><div class="right"><button id="refresh" class="secondary">Refresh</button><button id="logout" class="secondary">Sign out</button></div></div>
-<div class="stats"><div class="stat platformOnly active" data-kind="reports"><b id="reportsCount">—</b><div class="sub">Reports</div></div><div class="stat platformOnly" data-kind="fuel"><b id="fuelCount">—</b><div class="sub">Fuel receipts</div></div><div class="stat platformOnly" data-kind="defects"><b id="defectsCount">—</b><div class="sub">Defect photos</div></div><div class="stat" data-kind="fleet"><b>QR</b><div class="sub">Fleet enrolment</div></div><div class="stat platformOnly" data-kind="compliance"><b>✓</b><div class="sub">Ownership & compliance</div></div></div>
+<div class="stats"><div class="stat platformOnly active" data-kind="reports"><b id="reportsCount">—</b><div class="sub">Reports</div></div><div class="stat" data-kind="journeys"><b id="journeysCount">↔</b><div class="sub">Journeys</div></div><div class="stat platformOnly" data-kind="fuel"><b id="fuelCount">—</b><div class="sub">Fuel receipts</div></div><div class="stat platformOnly" data-kind="defects"><b id="defectsCount">—</b><div class="sub">Defect photos</div></div><div class="stat" data-kind="fleet"><b>QR</b><div class="sub">Fleet enrolment</div></div><div class="stat platformOnly" data-kind="compliance"><b>✓</b><div class="sub">Ownership & compliance</div></div></div>
 <div id="status" class="status"></div>
 <div id="reportFilters" class="report-filters hidden" aria-label="Report organisation">
   <label for="reportGroup">Group by
@@ -465,6 +465,37 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   <div id="reportCount" class="report-count" aria-live="polite"></div>
 </div>
 <div id="recordsTable" class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+
+<section id="journeysPanel" class="card hidden">
+  <div class="note">Phone reports are shown separately until shared Journey IDs are available. Checkpoints from the same phone and session are grouped together.</div>
+  <div class="fleetgrid">
+    <div><label for="journeysFleet">Fleet</label><select id="journeysFleet"></select></div>
+    <div><label for="journeysMode">Journey mode</label><select id="journeysMode">
+      <option value="all">All journeys</option><option value="Single Driver">Single Driver</option>
+      <option value="Double Manning">Double Manning</option>
+    </select></div>
+    <div><label for="journeysVehicleType">Vehicle type</label><select id="journeysVehicleType">
+      <option value="all">All vehicles</option><option value="Car / Van">Car / Van</option>
+      <option value="Van + Tacho">Van + Tacho</option><option value="Truck">Truck</option>
+      <option value="Bus">Bus</option>
+    </select></div>
+    <div><label for="journeysRegistration">Registration</label><input id="journeysRegistration" maxlength="32" placeholder="131D11111"></div>
+    <div><label for="journeysDateFrom">From</label><input id="journeysDateFrom" type="date"></div>
+    <div><label for="journeysDateTo">To</label><input id="journeysDateTo" type="date"></div>
+    <div><label for="journeysGroup">Group by</label><select id="journeysGroup">
+      <option value="day">Day</option><option value="week">Week</option>
+      <option value="registration">Vehicle registration</option>
+    </select></div>
+  </div>
+  <div class="compliance-actions">
+    <button id="journeysSearch" class="teal" type="button">Search</button>
+    <button id="journeysClear" class="secondary" type="button">Clear</button>
+  </div>
+  <div id="journeysSummary" class="note" aria-live="polite"></div>
+  <div class="table" style="overflow-x:auto"><table>
+    <thead id="journeysHead"></thead><tbody id="journeysBody"></tbody>
+  </table></div>
+</section>
 <section id="compliancePanel" class="card hidden">
 <h2>Ownership & compliance</h2>
 <div class="sub">Central handover and compliance contacts. These details are stored securely in ROAD 1ST, not in the driver app.</div>
@@ -912,6 +943,137 @@ document.getElementById("clearReportSearch").onclick=function(){
 reportGroupSelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
 reportCategorySelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
 document.addEventListener("road1st-portal-language-change",function(){if(C==="reports"&&reportItems.length)renderReportGroups()});
+
+
+var journeysItems=[];
+function fillJourneysFleets(){
+  var sel=document.getElementById("journeysFleet"),
+      current=sel.value||document.getElementById("fleetSelect").value;
+  sel.textContent="";
+  var fleets=fleetData&&fleetData.fleets||[];
+  fleets.forEach(function(f){
+    var o=document.createElement("option");o.value=f.id;o.textContent=f.name;
+    if(f.id===current)o.selected=true;
+    sel.appendChild(o);
+  });
+}
+function journeysSearchParams(){
+  var params=new URLSearchParams(),
+      from=document.getElementById("journeysDateFrom").value,
+      to=document.getElementById("journeysDateTo").value,
+      reg=document.getElementById("journeysRegistration").value.trim();
+  if(from&&to&&from>to)throw Error(reportT("Start date must not be after end date."));
+  params.set("kind","journeys");
+  params.set("fleet_id",document.getElementById("journeysFleet").value);
+  params.set("mode",document.getElementById("journeysMode").value);
+  params.set("vehicle_type",document.getElementById("journeysVehicleType").value);
+  if(reg)params.set("registration",reg);
+  if(from)params.set("after",new Date(from+"T00:00:00").toISOString());
+  if(to){var d=new Date(to+"T00:00:00");d.setDate(d.getDate()+1);params.set("before",d.toISOString())}
+  return params.toString();
+}
+async function searchJourneys(){
+  var button=document.getElementById("journeysSearch"),summary=document.getElementById("journeysSummary");
+  button.disabled=true;summary.textContent=reportT("Searching…");
+  try{
+    var result=await api(F+"?"+journeysSearchParams());
+    journeysItems=result.items||[];
+    renderJourneys();
+    var doubles=journeysItems.filter(function(x){return x.mode==="Double Manning"}).length;
+    summary.textContent=journeysItems.length+" "+reportT("Journeys")+
+      " · "+doubles+" "+reportT("Double Manning")+
+      (result.limited?" · "+reportT("Search limited. Narrow the date range or registration."):"");
+    document.getElementById("journeysCount").textContent=journeysItems.length;
+    status.textContent=reportT("Journeys");
+  }catch(e){
+    summary.textContent=e.message||"Could not load journeys.";
+    document.getElementById("journeysBody").textContent="";
+  }finally{button.disabled=false}
+}
+function renderJourneys(){
+  var header=document.getElementById("journeysHead"),body=document.getElementById("journeysBody");
+  header.textContent="";body.textContent="";
+  var h=document.createElement("tr");
+  [reportT("Started"),reportT("Journey mode"),reportT("Vehicle type"),reportT("Registration"),
+   reportT("Phone at start"),reportT("View report"),reportT("Download")].forEach(function(name){
+    var th=document.createElement("th");th.textContent=name;h.appendChild(th);
+  });
+  header.appendChild(h);
+  if(!journeysItems.length){
+    var empty=document.createElement("tr"),td=document.createElement("td");
+    td.colSpan=7;td.textContent=reportT("No journeys found.");empty.appendChild(td);body.appendChild(empty);return;
+  }
+  var grouping=document.getElementById("journeysGroup").value,groups=new Map();
+  journeysItems.forEach(function(x){
+    var key=grouping==="registration"
+      ?{key:x.registration||"unassigned",label:x.registration||reportT("Unassigned registration")}
+      :reportBucket(x.started_at,grouping);
+    if(!groups.has(key.key))groups.set(key.key,{label:key.label,items:[]});
+    groups.get(key.key).items.push(x);
+  });
+  groups.forEach(function(group){
+    var groupRow=document.createElement("tr");groupRow.className="report-group";
+    var groupCell=document.createElement("td");groupCell.colSpan=7;
+    groupCell.textContent=group.label+" · "+group.items.length+" "+reportT("Journeys");
+    groupRow.appendChild(groupCell);body.appendChild(groupRow);
+    group.items.forEach(function(x){
+      var tr=document.createElement("tr");
+      cell(tr,date(x.started_at));cell(tr,reportT(x.mode));cell(tr,reportT(x.vehicle_type));
+      cell(tr,x.registration||"—");
+      cell(tr,x.mode==="Double Manning"?reportT(x.phone_role_at_start||"Unknown"):"—");
+      var viewCell=document.createElement("td"),view=document.createElement("button");
+      view.type="button";view.className="viewbtn";view.textContent=reportT("View report");
+      view.onclick=function(){openJourneyReport(x)};
+      viewCell.appendChild(view);tr.appendChild(viewCell);
+      var downloadCell=document.createElement("td"),download=document.createElement("button");
+      download.type="button";download.className="secondary";download.textContent=reportT("Download");
+      download.onclick=function(){downloadJourneyReport(x).catch(function(e){status.textContent=e.message||"Download failed."})};
+      downloadCell.appendChild(download);tr.appendChild(downloadCell);
+      var note=document.createElement("tr"),info=document.createElement("td");info.colSpan=7;
+      info.className="sub";
+      info.textContent=(x.report_status==="Checkpoint"?reportT("Checkpoint only"):reportT("Report received"))+
+        " · "+x.report_files+" "+reportT("report files")+
+        (x.linked_at_start?" · "+reportT("Phones linked at start"):"");
+      note.appendChild(info);
+      body.appendChild(tr);body.appendChild(note);
+    });
+  });
+}
+async function downloadJourneyReport(item){
+  var result=await api(F,{method:"POST",body:JSON.stringify({
+    action:"fleet_file_url",fleet_id:document.getElementById("journeysFleet").value,
+    record_id:item.id,record_kind:"reports"
+  })});
+  var a=document.createElement("a");a.href=result.url;a.target="_blank";a.rel="noopener noreferrer";
+  document.body.appendChild(a);a.click();a.remove();
+}
+async function openJourneyReport(item){
+  viewer.classList.remove("hidden");viewerContent.textContent="";
+  viewerTitle.textContent=reportT("ROAD 1ST Report");viewerFile.textContent=item.original_filename||"";
+  viewerLoading.classList.remove("hidden");
+  try{
+    var result=await api(F,{method:"POST",body:JSON.stringify({
+      action:"view_fleet_report",fleet_id:document.getElementById("journeysFleet").value,
+      record_id:item.id,record_kind:"reports"
+    })});
+    showReport(result,item.id,true);
+    viewerDownload.onclick=function(){downloadJourneyReport(item).catch(function(e){status.textContent=e.message||"Download failed."})};
+  }catch(e){viewerContent.textContent=e.message||"Report unavailable."}
+  finally{viewerLoading.classList.add("hidden")}
+}
+document.getElementById("journeysSearch").onclick=searchJourneys;
+document.getElementById("journeysGroup").onchange=renderJourneys;
+document.getElementById("journeysFleet").onchange=searchJourneys;
+document.getElementById("journeysClear").onclick=function(){
+  ["journeysRegistration","journeysDateFrom","journeysDateTo"].forEach(function(id){document.getElementById(id).value=""});
+  document.getElementById("journeysMode").value="all";
+  document.getElementById("journeysVehicleType").value="all";
+  document.getElementById("journeysGroup").value="day";
+  searchJourneys();
+};
+document.addEventListener("road1st-portal-language-change",function(){
+  if(C==="journeys"&&journeysItems.length)renderJourneys();
+});
 
 function val(id,v){document.getElementById(id).value=v||""}
 function renderCompliance(d){var p=d.profile||{};val("organisationName",p.organisation_name||"ROAD 1ST");val("ownerName",p.owner_name);val("ownerEmail",p.owner_email);val("ownerPhone",p.owner_phone);val("complianceName",p.compliance_contact_name);val("complianceEmail",p.compliance_contact_email);val("technicalName",p.technical_contact_name);val("technicalEmail",p.technical_contact_email);val("privacyEmail",p.privacy_contact_email);val("playEmail",p.play_console_contact_email);val("complianceNotes",p.notes);document.getElementById("routeAll").checked=p.route_all_notifications_to_owner!==false;document.getElementById("complianceMeta").textContent=p.updated_at?"Last updated "+date(p.updated_at)+".":"";var list=document.getElementById("reviewList"),reviews=d.reviews||[];list.textContent="";if(!reviews.length){list.textContent="No reviews recorded yet.";return}reviews.forEach(function(r){var x=document.createElement("div");x.className="reviewitem";var b=document.createElement("b");b.textContent=(r.review_type||"Compliance review")+" · "+String(r.status||"").replace(/_/g," ");var s=document.createElement("div");s.textContent=r.summary||"";var m=document.createElement("div");m.className="sub";m.textContent=date(r.reviewed_at)+(r.due_at?" · Due "+date(r.due_at):"");x.appendChild(b);x.appendChild(s);x.appendChild(m);list.appendChild(x)})}
@@ -1392,7 +1554,7 @@ async function revokeFleetDevice(deviceId){
   }catch(e){status.textContent=e.message||"Could not revoke phone."}
 }
 function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres",reportT("Fuel Card"),"Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.fuel_card||"—");previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
-async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value);try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent=reportT("Reports")+": "+reportItems.length+" / "+reportTotal+" · "+reportT("Category");return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent=reportT(k==="fuel"?"Fuel receipts":"Defect photos")+": "+(d.items||[]).length+" / "+d.total}
+async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");document.getElementById("journeysPanel").classList.add("hidden");if(k==="journeys"){document.getElementById("title").textContent=reportT("Journeys");document.getElementById("journeysPanel").classList.remove("hidden");if(!fleetData||!fleetData.fleets){fleetData=await api(F)}fillJourneysFleets();await searchJourneys();return}if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value);try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent=reportT("Reports")+": "+reportItems.length+" / "+reportTotal+" · "+reportT("Category");return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent=reportT(k==="fuel"?"Fuel receipts":"Defect photos")+": "+(d.items||[]).length+" / "+d.total}
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}
 async function show(){login.classList.add("hidden");dash.classList.remove("hidden");var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
 document.getElementById("saveCompliance").onclick=saveCompliance;

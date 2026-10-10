@@ -510,6 +510,35 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
   </div>
 </div>
+<div class="reviewlist" id="fleetRecords">
+  <strong>Fleet records</strong>
+  <div class="fleetgrid">
+    <div><label for="fleetRecordReg">Registration</label><input id="fleetRecordReg" maxlength="32" placeholder="131D11111"></div>
+    <div><label for="fleetRecordFrom">From</label><input id="fleetRecordFrom" type="date"></div>
+    <div><label for="fleetRecordTo">To</label><input id="fleetRecordTo" type="date"></div>
+    <div><label for="fleetRecordCategory">Category</label><select id="fleetRecordCategory">
+      <option value="all">All categories</option>
+      <option value="Journeys">Journeys &amp; checkpoints</option>
+      <option value="Walkaround">Walkaround checks</option>
+      <option value="Fuel receipts">Fuel receipts</option>
+      <option value="Defect photos">Defect photos</option>
+      <option value="App blocking">App-blocking tests</option>
+      <option value="Setup">Setup reports</option>
+      <option value="Ferry mode">Ferry mode</option>
+      <option value="Other">Other</option>
+    </select></div>
+    <div><label for="fleetRecordGroup">Group by</label><select id="fleetRecordGroup">
+      <option value="day">Day</option><option value="week">Week</option>
+      <option value="registration">Vehicle registration</option>
+    </select></div>
+  </div>
+  <div class="compliance-actions">
+    <button id="fleetRecordSearch" class="teal" type="button">Search</button>
+    <button id="fleetRecordClear" class="secondary" type="button">Clear</button>
+  </div>
+  <div id="fleetRecordCount" class="note" aria-live="polite"></div>
+  <div class="table" style="overflow-x:auto"><table><thead id="fleetRecordHead"></thead><tbody id="fleetRecordBody"></tbody></table></div>
+</div>
 <div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
 <div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
 <div class="reviewlist" id="fleetUpdates">
@@ -670,7 +699,7 @@ function addKpi(parent,label,value){var x=document.createElement("div"),b=docume
 function addRow(parent,label,value){var x=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong");x.className="viewer-row";a.textContent=label;b.textContent=value==null||value===""?"—":String(value);x.appendChild(a);x.appendChild(b);parent.appendChild(x)}
 function section(title){var x=document.createElement("section"),h=document.createElement("h3");x.className="viewer-section";h.textContent=title;x.appendChild(h);viewerContent.appendChild(x);return x}
 function closeViewer(){viewer.classList.add("hidden");viewerContent.textContent="";viewerDownload.onclick=null;CURRENT_REPORT=null;CURRENT_REPORT_FILE=""}
-function showReport(d,id){var r=d.report||{};CURRENT_REPORT=r;CURRENT_REPORT_FILE=d.filename||"";viewerContent.textContent="";viewerTitle.textContent=r.report_type==="setup_wizard"?"ROAD 1ST Setup Report":"ROAD 1ST Journey Report";viewerFile.textContent=d.filename||"";viewerDownload.onclick=function(){downloadFile("reports",id).catch(function(e){status.textContent=e.message})};
+function showReport(d,id,isFleet){var r=d.report||{};CURRENT_REPORT=r;CURRENT_REPORT_FILE=d.filename||"";viewerContent.textContent="";viewerTitle.textContent=r.report_type==="setup_wizard"?"ROAD 1ST Setup Report":"ROAD 1ST Journey Report";viewerFile.textContent=d.filename||"";viewerDownload.onclick=function(){(isFleet?downloadFleetFile({id:id,kind:"reports"}):downloadFile("reports",id)).catch(function(e){status.textContent=e.message})};
 var sum=document.createElement("div");sum.className="viewer-summary";addKpi(sum,"Duration",duration(r.duration_seconds));addKpi(sum,"Maximum speed",r.max_speed_kmh==null?"—":r.max_speed_kmh+" km/h");addKpi(sum,"Driving Mode",r.driving_activations?("Activated "+r.driving_activations+"×"):"Not activated");addKpi(sum,"GPS usable",r.gps_samples?(r.usable_gps_samples+" / "+r.gps_samples):"—");viewerContent.appendChild(sum);
 var details=section("Journey summary"),grid=document.createElement("div");grid.className="viewer-grid";addRow(grid,"Started",date(r.start_utc));addRow(grid,"Finished",date(r.end_utc));addRow(grid,"App version",r.version);addRow(grid,"Vehicle",words(r.vehicle_type));addRow(grid,"Journey mode",r.journey_mode);addRow(grid,"Start mode",words(r.start_mode));addRow(grid,"End reason",words(r.end_reason));addRow(grid,"Automatic resumes",r.auto_resumes);addRow(grid,"Bluetooth connected events",r.bluetooth_connected_events);addRow(grid,"Bluetooth disconnected events",r.bluetooth_disconnected_events);addRow(grid,"Cloud checkpoints",r.checkpoints);addRow(grid,"Blocked apps",r.blocked_app_count);details.appendChild(grid);
 var controls=r.controls||{},keys=Object.keys(controls).filter(function(k){return k!=="auto_resume_on_movement"});if(keys.length){var cs=section("Stops, breaks and controls");keys.forEach(function(k){addRow(cs,controlName(k),controls[k]+" recorded")})}
@@ -821,6 +850,9 @@ function renderFleet(d){
     line.appendChild(name);line.appendChild(archive);fuelList.appendChild(line);
   });
   renderFleetVehicles();
+  fleetRecordItems=[];
+  document.getElementById("fleetRecordBody").textContent="";
+  document.getElementById("fleetRecordCount").textContent="";
   var drivers={};(d.drivers||[]).forEach(function(x){drivers[x.id]=x.display_name});
   var list=document.getElementById("deviceList"),devices=d.devices||[];
   list.textContent="";
@@ -1017,6 +1049,104 @@ async function archiveFleetVehicle(id,registration){
     status.textContent=reportT("Vehicle archived. Existing records were not deleted.");
   }catch(e){status.textContent=e.message||"Could not archive vehicle."}
 }
+var fleetRecordItems=[];
+function fleetReportParameters(){
+  var params=new URLSearchParams(),reg=document.getElementById("fleetRecordReg").value.trim(),
+      from=document.getElementById("fleetRecordFrom").value,to=document.getElementById("fleetRecordTo").value;
+  if(from&&to&&from>to)throw Error(reportT("Start date must not be after end date."));
+  params.set("kind","records");
+  params.set("fleet_id",document.getElementById("fleetSelect").value);
+  params.set("category",document.getElementById("fleetRecordCategory").value);
+  if(reg)params.set("registration",reg);
+  if(from)params.set("after",new Date(from+"T00:00:00").toISOString());
+  if(to){var d=new Date(to+"T00:00:00");d.setDate(d.getDate()+1);params.set("before",d.toISOString())}
+  return params.toString();
+}
+async function searchFleetRecords(){
+  var button=document.getElementById("fleetRecordSearch");
+  button.disabled=true;
+  document.getElementById("fleetRecordCount").textContent=reportT("Searching…");
+  try{
+    var result=await api(F+"?"+fleetReportParameters());
+    fleetRecordItems=result.records||[];
+    renderFleetRecordRows();
+    document.getElementById("fleetRecordCount").textContent=fleetRecordItems.length+" "+reportT("records")+
+      (result.limited?" · "+reportT("Search limited. Narrow the date range or registration."):"");
+  }catch(e){document.getElementById("fleetRecordCount").textContent=e.message||"Search failed."}
+  finally{button.disabled=false}
+}
+function renderFleetRecordRows(){
+  var thead=document.getElementById("fleetRecordHead"),
+      tbody=document.getElementById("fleetRecordBody"),
+      grouping=document.getElementById("fleetRecordGroup").value;
+  thead.textContent="";tbody.textContent="";
+  var titles=[reportT("Received"),reportT("Registration"),reportT("Category"),reportT("Details"),reportT("View"),reportT("Download")];
+  var top=document.createElement("tr");titles.forEach(function(label){var th=document.createElement("th");th.textContent=label;top.appendChild(th)});thead.appendChild(top);
+  var groups=new Map();
+  fleetRecordItems.forEach(function(x){
+    var reg=String(x.registration||""),g=grouping==="registration"
+      ?{key:reg||"unassigned",label:reg||reportT("Unassigned registration")}
+      :reportBucket(x.date,grouping);
+    if(!groups.has(g.key))groups.set(g.key,{label:g.label,records:[]});
+    groups.get(g.key).records.push(x);
+  });
+  if(!groups.size){var empty=document.createElement("tr"),c=document.createElement("td");c.colSpan=6;c.textContent=reportT("No matching records.");empty.appendChild(c);tbody.appendChild(empty);return}
+  groups.forEach(function(group){
+    var header=document.createElement("tr");header.className="report-group";
+    var name=document.createElement("td");name.colSpan=6;name.textContent=group.label+" · "+group.records.length;
+    header.appendChild(name);tbody.appendChild(header);
+    group.records.forEach(function(x){
+      var tr=document.createElement("tr");
+      cell(tr,date(x.date));cell(tr,x.registration||"—");cell(tr,reportT(x.category));cell(tr,x.description||"—");
+      var viewCell=document.createElement("td"),view=document.createElement("button");
+      view.type="button";view.className="viewbtn";view.textContent=reportT("View");
+      view.onclick=function(){if(x.kind==="reports")viewFleetReport(x);else previewFleetImage(x)};
+      viewCell.appendChild(view);tr.appendChild(viewCell);
+      var dlCell=document.createElement("td"),download=document.createElement("button");
+      download.type="button";download.className="secondary";download.textContent=reportT("Download");
+      download.onclick=function(){downloadFleetFile(x).catch(function(e){status.textContent=e.message})};
+      dlCell.appendChild(download);tr.appendChild(dlCell);tbody.appendChild(tr);
+    });
+  });
+}
+async function fleetFileInfo(item){
+  return await api(F,{method:"POST",body:JSON.stringify({
+    action:"fleet_file_url",fleet_id:document.getElementById("fleetSelect").value,
+    record_id:item.id,record_kind:item.kind
+  })});
+}
+async function downloadFleetFile(item){
+  var d=await fleetFileInfo(item);
+  var a=document.createElement("a");a.href=d.url;a.target="_blank";a.rel="noopener noreferrer";
+  document.body.appendChild(a);a.click();a.remove();
+}
+async function viewFleetReport(item){
+  viewer.classList.remove("hidden");viewerContent.textContent="";
+  viewerTitle.textContent=reportT("ROAD 1ST Report");viewerFile.textContent=item.description||"";
+  viewerLoading.classList.remove("hidden");
+  try{
+    var d=await api(F,{method:"POST",body:JSON.stringify({
+      action:"view_fleet_report",fleet_id:document.getElementById("fleetSelect").value,
+      record_id:item.id,record_kind:"reports"
+    })});
+    showReport(d,item.id,true);
+  }catch(e){viewerContent.textContent=e.message||"Could not read report."}
+  finally{viewerLoading.classList.add("hidden")}
+}
+async function previewFleetImage(item){
+  imagePreview.classList.remove("hidden");
+  imagePreviewTitle.textContent=reportT(item.category);
+  imagePreviewMeta.textContent=(item.registration||"—")+" · "+date(item.date);
+  imagePreviewBody.textContent=reportT("Loading image…");
+  try{
+    var d=await fleetFileInfo(item);
+    var img=document.createElement("img");img.alt=reportT(item.category);
+    img.onload=function(){imagePreviewBody.textContent="";imagePreviewBody.appendChild(img)};
+    img.onerror=function(){imagePreviewBody.textContent=reportT("Could not display image.")};
+    img.src=d.url;
+    imagePreviewDownload.onclick=function(){downloadFleetFile(item).catch(function(e){status.textContent=e.message})};
+  }catch(e){imagePreviewBody.textContent=e.message||"Preview unavailable."}
+}
 async function addFleetFuelCard(){
   var fleetId=document.getElementById("fleetSelect").value,
       field=document.getElementById("newFuelCardName"),
@@ -1176,6 +1306,15 @@ document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
 document.getElementById("addFleetVehicle").onclick=addFleetVehicle;
 document.getElementById("fleetVehicleFind").oninput=renderFleetVehicles;
+document.getElementById("fleetRecordSearch").onclick=searchFleetRecords;
+document.getElementById("fleetRecordGroup").onchange=renderFleetRecordRows;
+document.getElementById("fleetRecordClear").onclick=function(){
+  ["fleetRecordReg","fleetRecordFrom","fleetRecordTo"].forEach(function(id){
+    document.getElementById(id).value="";
+  });
+  document.getElementById("fleetRecordCategory").value="all";
+  searchFleetRecords();
+};
 document.getElementById("fleetSelect").onchange=function(){
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("updateQrArea").classList.add("hidden");

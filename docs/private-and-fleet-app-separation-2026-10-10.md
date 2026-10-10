@@ -10,9 +10,12 @@ Use distinct Android applicationId values and isolated app-private data stores. 
 
 ## Work / personal switch
 - A driver can install both apps side by side, each with its own distinct icon/name and independent storage.
-- Fleet app displays company name and a prominent WORK/FLEET ACTIVE status only during an active, authorised duty/shift. Fleet capture starts only upon deliberately starting a fleet duty session, not merely because phone moves, Bluetooth connects, the app is installed, or the user opens Private.
-- Fleet duty ends with an explicit **End Fleet Duty** action; journey end, rest, temporary stop, double-manning changeover and ferry mode have independent meanings and MUST NOT silently end a lawful work recording or restart private tracking.
-- Once duty ends, stop fleet-side location/movement monitoring, reporting, fleet-identifying logs and new fleet record capture; stop foreground services and scheduled work appropriate to that duty. Fleet app must not auto-restart location monitoring during personal travel.
+- **SOS — Start of Shift:** explicit driver action inside ROAD 1ST Fleet starts the fleet duty session and its authorised work recording. Show company name, SOS timestamp and a prominent FLEET SHIFT ACTIVE indicator. SOS is not triggered by motion, Bluetooth, phone startup, launching the personal app, or entering a vehicle.
+- **EOS — End of Shift:** explicit driver action inside ROAD 1ST Fleet records the EOS timestamp and closes the fleet duty session. At EOS, immediately cease NEW fleet-side collection of location, movement, journey checkpoints, fleet activity logs and work telemetry; stop the related location/monitoring foreground services and scheduling. Do not resume fleet tracking until the driver explicitly starts another SOS.
+- SOS/EOS denote the **whole work shift**, not the beginning/end of each journey. Driving breaks, rest, Temporary Stop, Police Stop, ferry mode, walkaround and double-manning driver changes must not silently start or end an SOS/EOS session.
+- When EOS completes, show **FLEET SHIFT ENDED — NOT TRACKING**. ROAD 1ST Fleet must neither monitor nor upload NEW personal activity after EOS, including on Bluetooth connection, phone reboot, app closing or background restart. Pending records created strictly between SOS and EOS may upload afterward (subject to Ferry Mode's no-upload rule) with their original work timestamps and fleet identifiers; this does not authorise any further personal tracking.
+- ROAD 1ST Private remains a completely separate application/identity and must never transmit a private journey into the Fleet account, regardless of whether both apps are installed. Start a personal journey only in Private; SOS cannot be initiated from the Private app.
+- Keep an obvious ongoing shift indicator and End of Shift action to reduce accidental after-hours tracking if the driver forgets EOS. Add nonintrusive reminders when appropriate; never silently extend tracking indefinitely without clear driver awareness. Ensure SOS/EOS work offline and are queued for later fleet reporting as timestamp-only transition records, without continuing location monitoring after EOS.
 - Upload of ALREADY collected work records after duty may complete under a disclosed policy (and not while Ferry Mode blocks uploads); it must not gather new private movement or location data. Display pending work upload count if needed.
 - Private app must not include fleet enrolment credentials, report upload queue, or identity linkage to a fleet. No private driver data appears in the fleet dashboard.
 - Driving protection must remain reliable if driver elects to use Private on a personal journey. When Fleet duty is active, prevent the two apps from fighting over overlay/blocking/monitor services. Test handoff of protection without gaps.
@@ -31,8 +34,8 @@ The split is a new, significant app/build and Play Store product task; no APK or
 ## Acceptance tests before pilot or Play Store
 1. Same Samsung phone, both apps installed, unique launcher icons, no shared account/stored data.
 2. Drive Private: no fleet reports/positions arrive in cloud, even with Wi-Fi mid-trip, after trip, on reboot, or when Fleet app isn't open.
-3. Start fleet duty, exercise walkaround/report/photo, end duty: only fleet work records go to correct fleet; any delayed upload contains only prior work files.
-4. After End Fleet Duty, drive privately immediately, including background app/BT auto-connect/reboot: no fleet tracking, messages, or new records; core protection works through Private.
+3. Tap SOS, exercise walkaround/report/photo and a break or double-manning transition, tap EOS: only work records between SOS and EOS go to the correct fleet; delayed upload includes only pre-EOS work files.
+4. Tap EOS, then drive privately immediately, including background app/BT auto-connect/reboot: no fleet tracking or new personal records on the fleet account; core protection works through Private. Verify queued pre-EOS work uploads remain correctly attributed.
 5. Shift/break/ferry/double-manning transitions still follow approved ROAD 1ST behaviours.
 6. Two phones/two drivers/two fleets: no cross-fleet/private data leakage; managers cannot retrieve Private activity.
 7. All relevant privacy notices, separate terms and fleet agreement acceptance logged server-side with version/time.

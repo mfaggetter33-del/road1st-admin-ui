@@ -1118,7 +1118,7 @@ function renderApplications(){
       var approve=document.createElement("button");approve.type="button";
       approve.className="teal";approve.textContent=reportT("Approve");
       approve.onclick=async function(){
-        var ok=await confirmRoad1st("Approve","Approve this company and create its private fleet?","Approve");
+        var ok=await confirmRoad1st("Approve",app.company_name,"Approve this company and create its private fleet?","Approve");
         if(!ok)return;
         approve.disabled=true;
         try{
@@ -1132,7 +1132,7 @@ function renderApplications(){
       var decline=document.createElement("button");decline.type="button";
       decline.className="secondary";decline.textContent=reportT("Decline");
       decline.onclick=async function(){
-        var ok=await confirmRoad1st("Decline","Decline this fleet application? No account will be activated.","Decline");
+        var ok=await confirmRoad1st("Decline",app.company_name,"Decline this fleet application? No account will be activated.","Decline");
         if(!ok)return;
         decline.disabled=true;
         try{
@@ -1428,7 +1428,7 @@ function confirmRoad1st(title,subject,message,action){
     messageEl.textContent=message?reportT(message):"";
     messageEl.hidden=!message;
     cancel.textContent=reportT("Cancel");
-    approve.textContent=reportT(action);
+    approve.textContent=reportT(action||title||"Confirm");
     function finish(result){
       if(finished)return;
       finished=true;

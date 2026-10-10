@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Join ROAD 1ST Fleet</title><link rel="icon" type="image/svg+xml" href="road1st-logo.svg"><meta name="theme-color" content="#0a0e14">
+<style>
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#111822;--border:#2b3646;--muted:#9ea9b8;--teal:#2dd4bf;--purple:#7c3aed}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:radial-gradient(circle at 10% 0%,rgba(124,58,237,.2),transparent 34rem),var(--bg);color:#f6f8fb}
+main{max-width:670px;margin:30px auto;padding:18px}header{display:flex;gap:16px;align-items:center;margin-bottom:22px}header img{width:72px;height:72px}h1{margin:0;font-size:28px}small,p{color:var(--muted);line-height:1.6}
+article{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:25px;box-shadow:0 18px 54px #0006}
+label{display:block;color:var(--muted);font-size:13px;font-weight:700;margin:18px 0 8px}
+input{width:100%;padding:14px;border:1px solid var(--border);border-radius:12px;background:#0d131c;color:white;font-size:16px}input:focus{outline:2px solid var(--teal)}
+button{margin-top:20px;padding:14px 20px;width:100%;background:var(--purple);color:white;border:0;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer}button:disabled{opacity:.5}
+a{color:var(--teal)}.message{margin-top:15px;font-weight:600;min-height:26px}.hidden{display:none}.honeypot{position:absolute;left:-99999px}
+</style></head><body>
+<main><header><img src="road1st-logo.svg" alt="ROAD 1ST"><div><h1>Join ROAD 1ST Fleet</h1><small>Fleet safety, journey and vehicle records</small></div></header>
+<article><h2>Apply for fleet access</h2><p>Send your company details for review. A ROAD 1ST administrator must approve the application before a fleet portal becomes available. No payment is taken here.</p>
+<form id="application">
+<label for="company">Company name</label><input id="company" name="company_name" required minlength="2" maxlength="160" autocomplete="organization">
+<label for="manager">Fleet manager name</label><input id="manager" name="contact_name" required minlength="2" maxlength="160" autocomplete="name">
+<label for="email">Fleet manager email</label><input id="email" name="contact_email" type="email" required maxlength="254" autocomplete="email">
+<label for="phone">Contact telephone (optional)</label><input id="phone" name="phone" type="tel" maxlength="40" autocomplete="tel">
+<label for="vehicles">Approximate number of vehicles (optional)</label><input id="vehicles" name="expected_vehicles" type="number" min="1" max="100000" step="1">
+<div class="honeypot" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+<p>We use these contact details only to review your fleet application and arrange your account. You will choose your own password later.</p>
+<button id="submit" type="submit">Send application</button>
+<div class="message" id="result" role="status" aria-live="polite"></div>
+</form></article><p style="text-align:center"><a href="./">Fleet manager sign in</a></p>
+</main>
+<script>
+(function(){"use strict";
+  var form=document.getElementById("application"),button=document.getElementById("submit"),
+      result=document.getElementById("result");
+  form.addEventListener("submit",async function(e){
+    e.preventDefault();if(!form.reportValidity())return;
+    button.disabled=true;result.textContent="Sending…";
+    var values=Object.fromEntries(new FormData(form).entries());
+    try{
+      var response=await fetch("https://ghyeurbeqwjfyzdwcepn.supabase.co/functions/v1/road1st-fleet-onboarding",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({action:"apply"},values))
+      });
+      var payload=await response.json();
+      if(!response.ok)throw Error(payload.error==="invalid_application"?"Please check your details and try again.":"Could not send your application. Please try again later.");
+      form.reset();
+      result.style.color="#2dd4bf";
+      result.textContent="Application received. We'll review it before any fleet access is activated.";
+    }catch(error){result.style.color="#f87171";result.textContent=error.message||"Application unavailable."}
+    finally{button.disabled=false}
+  });
+})();
+</script></body></html>

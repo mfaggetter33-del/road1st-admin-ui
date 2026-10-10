@@ -723,7 +723,7 @@ function renderReportGroups(){
   headers(["Received","Vehicle Reg","Category","App","File","Lines","Size","View","Download"]);
   if(!filtered.length){
     var empty=document.createElement("tr"),td=document.createElement("td");td.colSpan=9;
-    td.textContent=reportT("No matching reports.");empty.appendChild(td);body.appendChild(empty);return;
+    td.textContent=reportT("No reports in this category.");empty.appendChild(td);body.appendChild(empty);return;
   }
   var buckets=new Map();
   filtered.forEach(function(x){

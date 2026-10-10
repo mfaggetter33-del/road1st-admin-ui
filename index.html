@@ -467,7 +467,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div id="recordsTable" class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
 
 <section id="journeysPanel" class="card hidden">
-  <div class="note">Phone reports are shown separately until shared Journey IDs are available. Checkpoints from the same phone and session are grouped together.</div>
+  <div class="note">Phone reports are listed separately until shared Journey IDs are available.</div>
   <div class="fleetgrid">
     <div><label for="journeysFleet">Fleet</label><select id="journeysFleet"></select></div>
     <div><label for="journeysMode">Journey mode</label><select id="journeysMode">
@@ -995,13 +995,13 @@ function renderJourneys(){
   header.textContent="";body.textContent="";
   var h=document.createElement("tr");
   [reportT("Started"),reportT("Journey mode"),reportT("Vehicle type"),reportT("Registration"),
-   reportT("Phone at start"),reportT("View report"),reportT("Download")].forEach(function(name){
+   reportT("Phone"),reportT("View report"),reportT("Download")].forEach(function(name){
     var th=document.createElement("th");th.textContent=name;h.appendChild(th);
   });
   header.appendChild(h);
   if(!journeysItems.length){
     var empty=document.createElement("tr"),td=document.createElement("td");
-    td.colSpan=7;td.textContent=reportT("No journeys found.");empty.appendChild(td);body.appendChild(empty);return;
+    td.colSpan=7;td.textContent=reportT("No matching records.");empty.appendChild(td);body.appendChild(empty);return;
   }
   var grouping=document.getElementById("journeysGroup").value,groups=new Map();
   journeysItems.forEach(function(x){
@@ -1020,7 +1020,7 @@ function renderJourneys(){
       var tr=document.createElement("tr");
       cell(tr,date(x.started_at));cell(tr,reportT(x.mode));cell(tr,reportT(x.vehicle_type));
       cell(tr,x.registration||"—");
-      cell(tr,x.mode==="Double Manning"?reportT(x.phone_role_at_start||"Unknown"):"—");
+      cell(tr,x.mode==="Double Manning"?(x.phone_role_at_start==="Driver"||x.phone_role_at_start==="Co-driver"?reportT(x.phone_role_at_start):"—"):"—");
       var viewCell=document.createElement("td"),view=document.createElement("button");
       view.type="button";view.className="viewbtn";view.textContent=reportT("View report");
       view.onclick=function(){openJourneyReport(x)};
@@ -1031,9 +1031,9 @@ function renderJourneys(){
       downloadCell.appendChild(download);tr.appendChild(downloadCell);
       var note=document.createElement("tr"),info=document.createElement("td");info.colSpan=7;
       info.className="sub";
-      info.textContent=(x.report_status==="Checkpoint"?reportT("Checkpoint only"):reportT("Report received"))+
-        " · "+x.report_files+" "+reportT("report files")+
-        (x.linked_at_start?" · "+reportT("Phones linked at start"):"");
+      info.textContent=(x.report_status==="Checkpoint"?reportT("Cloud checkpoints"):reportT("Reports"))+
+        " · "+x.report_files+" "+reportT("Reports")+
+        "";
       note.appendChild(info);
       body.appendChild(tr);body.appendChild(note);
     });

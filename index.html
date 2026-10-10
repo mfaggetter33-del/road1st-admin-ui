@@ -373,6 +373,9 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 .qrbox svg{display:block;width:100%;height:auto}
 .device{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 .device button{padding:8px 11px;font-size:12px}
+#fleetFuelCardList .device{display:flex;justify-content:space-between;gap:12px;align-items:center}
+#fleetFuelCardList .device strong{overflow-wrap:anywhere}
+#fleetFuelCardList .device button{flex-shrink:0}
 #fleetPanel,#compliancePanel{margin-top:12px}
 @media(max-width:950px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:720px){.stats{grid-template-columns:1fr}.formgrid,.fleetgrid{grid-template-columns:1fr}.device{grid-template-columns:1fr}}
@@ -927,10 +930,11 @@ function renderFleet(d){
   cards.forEach(function(card){
     var line=document.createElement("div");line.className="device";
     var name=document.createElement("strong");name.textContent=card.label;
-    var archive=document.createElement("button");archive.type="button";archive.className="secondary";
-    archive.textContent=reportT("Archive");
-    archive.onclick=function(){archiveFleetFuelCard(card.id,card.label)};
-    line.appendChild(name);line.appendChild(archive);fuelList.appendChild(line);
+    var remove=document.createElement("button");remove.type="button";remove.className="secondary";
+    remove.textContent=reportT("Remove");
+    remove.setAttribute("aria-label",reportT("Remove fuel card")+": "+card.label);
+    remove.onclick=function(){removeFleetFuelCard(card.id,card.label)};
+    line.appendChild(name);line.appendChild(remove);fuelList.appendChild(line);
   });
   renderFleetVehicles();
   fleetRecordItems=[];
@@ -1354,16 +1358,22 @@ async function addFleetFuelCard(){
   }catch(e){feedback.textContent=fuelCardSaveError(e)}
   finally{button.disabled=false}
 }
-async function archiveFleetFuelCard(cardId,name){
-  var fleetId=document.getElementById("fleetSelect").value;
-  if(!await confirmRoad1st("Archive fuel card",name,"","Archive"))return;
+async function removeFleetFuelCard(cardId,name){
+  var fleetId=document.getElementById("fleetSelect").value,
+      feedback=document.getElementById("fleetFuelCardFeedback");
+  if(!await confirmRoad1st(
+    "Remove fuel card",name,
+    "This card will be removed from the fleet's active list. Existing fuel receipts will be kept.",
+    "Remove"
+  ))return;
+  feedback.textContent="";
   try{
     await api(F,{method:"POST",body:JSON.stringify({
       action:"archive_fuel_card",fleet_id:fleetId,fuel_card_id:cardId
     })});
     await loadFleet(fleetId);
-    status.textContent=reportT("Fuel card archived. Existing receipts remain unchanged.");
-  }catch(e){status.textContent=e.message||"Could not archive fuel card."}
+    feedback.textContent=reportT("Fuel card removed. Existing receipts remain unchanged.");
+  }catch(e){feedback.textContent=e.message||reportT("Could not remove fuel card.")}
 }
 async function revokeFleetDevice(deviceId){
   var fleetId=document.getElementById("fleetSelect").value;

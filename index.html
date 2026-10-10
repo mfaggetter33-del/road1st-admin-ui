@@ -1018,9 +1018,14 @@ async function publishPilotApk(){
     name=document.getElementById("pilotVersionName").value.trim(),
     code=Number(document.getElementById("pilotVersionCode").value),
     button=document.getElementById("publishPilotApk");
-  if(!file||!file.name.toLowerCase().endsWith(".apk")||!Number.isSafeInteger(code)||code<1||
-      !/^[a-zA-Z0-9._-]{3,48}$/.test(name)){
+  if(!file||!file.name.toLowerCase().endsWith(".apk")){
     pilotPublishMessage(reportT("Select signed APK"));return;
+  }
+  if(!/^[a-zA-Z0-9._-]{3,48}$/.test(name)){
+    pilotPublishMessage(reportT("Enter a valid version name."));return;
+  }
+  if(!Number.isSafeInteger(code)||code<1){
+    pilotPublishMessage(reportT("Enter the APK version code."));return;
   }
   if(file.size<1024||file.size>25165824){pilotPublishMessage("APK must be under 24 MB.");return;}
   button.disabled=true;pilotPublishMessage(reportT("Publishing APK"));
@@ -1400,9 +1405,21 @@ document.getElementById("closeDriverUpdateQr").onclick=function(){
 };
 document.getElementById("pilotApkFile").onchange=function(){
   document.getElementById("pilotPublishStatus").textContent="";
-  var name=this.files&&this.files[0]&&this.files[0].name||"",m=/^ROAD1ST-(\d+)\.(\d+)-pilot\.apk$/i.exec(name);
-  if(m){document.getElementById("pilotVersionName").value=m[1]+"."+m[2]+"-pilot";
-         document.getElementById("pilotVersionCode").value=m[2];}
+  var filename=this.files&&this.files[0]&&this.files[0].name||"",
+      match=/^ROAD1ST-(\d+\.\d+(?:\.\d+)?)-pilot\.apk$/i.exec(filename),
+      versionName=document.getElementById("pilotVersionName"),
+      versionCode=document.getElementById("pilotVersionCode");
+  // A file name does not usually contain Android's internal versionCode.
+  // Use 102 only for the signed, already verified 2.99.3 pilot build.
+  if(match){
+    versionName.value=match[1]+"-pilot";
+    if(match[1]==="2.99.3")versionCode.value="102";
+    else if(/^\d+\.\d+$/.test(match[1]))versionCode.value=match[1].split(".")[1];
+    else versionCode.value="";
+  }else{
+    versionName.value="";
+    versionCode.value="";
+  }
 };
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
 document.getElementById("saveWalkaroundRequirement").onclick=saveWalkaroundRequirement;

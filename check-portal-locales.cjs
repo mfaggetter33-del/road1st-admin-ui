@@ -70,8 +70,11 @@ const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="porta
   .replace(/<[^>]+>/g, "|")
   .replace(/&amp;/g, "&")
   .split("|").map(x => x.trim()).filter(x => x.length > 1);
+const fuelBrands = ["AS24","Allstar","Andamur","Aral","BP Plus","Circle K","DKV Mobility","E100","Eni","Esso Card","Eurowag","Keyfuels","Moeve","OMV","ORLEN","Q8","Radius","Shell Card","TotalEnergies","UK Fuels","UTA Edenred","VIALTIS"];
+for(const name of fuelBrands)
+  assert.ok(html.includes('>'+name+'</option>'), "fuel-card brand must remain its untranslated provider name: "+name);
 const coverage = new Set(data.keys.concat(data.more.keys, data.report.keys, data.messages.keys, data.events.keys, data.generatedReports.keys, data.timeline.keys, [
-  "ROAD 1ST ADMIN", "ROAD 1ST Server", "ROAD 1ST", "QR"
+  "ROAD 1ST ADMIN", "ROAD 1ST Server", "ROAD 1ST", "QR", ...fuelBrands
 ]));
 const missing = [...new Set(text)].filter(x => !coverage.has(x));
 assert.deepEqual(missing, [], "untranslated static portal labels");

@@ -482,6 +482,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
     <div><label>Signed APK</label><input id="pilotApkFile" type="file" accept=".apk,application/vnd.android.package-archive"></div>
     <div class="compliance-actions"><button id="publishPilotApk" class="secondary" type="button">Publish APK</button></div>
+    <div id="pilotPublishStatus" class="note" role="status" aria-live="polite"></div>
   </div>
   <div id="updateQrArea" class="hidden">
     <strong id="updateQrHeading">Update QR</strong>
@@ -807,6 +808,10 @@ async function refreshLatestPilot(){
     :reportT("No approved pilot APK yet.");
   if(fleetData)renderFleet(fleetData);
 }
+function pilotPublishMessage(message){
+  document.getElementById("pilotPublishStatus").textContent=message;
+  pilotPublishMessage(message);
+}
 async function publishPilotApk(){
   var input=document.getElementById("pilotApkFile"),file=input.files&&input.files[0],
     name=document.getElementById("pilotVersionName").value.trim(),
@@ -814,10 +819,10 @@ async function publishPilotApk(){
     button=document.getElementById("publishPilotApk");
   if(!file||!file.name.toLowerCase().endsWith(".apk")||!Number.isSafeInteger(code)||code<1||
       !/^[a-zA-Z0-9._-]{3,48}$/.test(name)){
-    status.textContent=reportT("Select signed APK");return;
+    pilotPublishMessage(reportT("Select signed APK"));return;
   }
-  if(file.size<1024||file.size>25165824){status.textContent="APK must be under 24 MB.";return;}
-  button.disabled=true;status.textContent=reportT("Publishing APK");
+  if(file.size<1024||file.size>25165824){pilotPublishMessage("APK must be under 24 MB.");return;}
+  button.disabled=true;pilotPublishMessage(reportT("Publishing APK"));
   try{
     if(!S||!S.expires_at||Date.now()>=S.expires_at)await refreshToken();
     var requestUrl=U+"?version="+encodeURIComponent(name)+"&code="+encodeURIComponent(String(code));
@@ -829,7 +834,7 @@ async function publishPilotApk(){
     if(!response.ok)throw Error(data.error||"Upload failed");
     input.value="";
     await refreshLatestPilot();
-    status.textContent=reportT("Published")+": "+name;
+    pilotPublishMessage(reportT("Published")+": "+name);
   }catch(e){status.textContent=e.message||"Upload failed"}finally{button.disabled=false}
 }
 async function copyDriverUpdateLink(){
@@ -871,6 +876,7 @@ document.getElementById("closeDriverUpdateQr").onclick=function(){
   document.getElementById("updateQrArea").classList.add("hidden");
 };
 document.getElementById("pilotApkFile").onchange=function(){
+  document.getElementById("pilotPublishStatus").textContent="";
   var name=this.files&&this.files[0]&&this.files[0].name||"",m=/^ROAD1ST-(\d+)\.(\d+)-pilot\.apk$/i.exec(name);
   if(m){document.getElementById("pilotVersionName").value=m[1]+"."+m[2]+"-pilot";
          document.getElementById("pilotVersionCode").value=m[2];}

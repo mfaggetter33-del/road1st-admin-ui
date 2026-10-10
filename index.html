@@ -825,7 +825,7 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
       catch(error){if(!error||error.name!=="AbortError")await copyWebsiteLink();}
     }
   };
-})();;
+})();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("fleetSelect").onchange=function(){
   document.getElementById("qrArea").classList.add("hidden");

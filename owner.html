@@ -196,6 +196,10 @@ function addFleetRow(area,f,pilot){
  rowMeta(info,(pilot?"Pilot fleet · ":"Registered fleet · ")+date(f.created_at));
  var actions=document.createElement("div");actions.className="row-actions";
  actions.appendChild(button("View "+(pilot?"pilot":"company"),function(){showCompany(f)}));
+ if(!pilot&&["active","suspended"].includes(f.status)){
+  var toggle=button(f.status==="suspended"?"Reactivate":"Suspend",function(){changeFleetStatus(f,toggle)},f.status==="suspended"?"teal":"purple");
+  actions.appendChild(toggle);
+ }
  item.appendChild(info);item.appendChild(actions);area.appendChild(item);
 }
 function renderCompanies(){
@@ -214,12 +218,18 @@ function showCompany(f){
  var area=el("detailFields");area.textContent="";
  putDetail(area,"Account type",isPilot(f)?"Internal pilot (not a customer)":"Customer or other registered fleet");
  putDetail(area,"Fleet status",f.status||"Unknown");
+ if(f.status==="suspended"&&f.suspension_reason)putDetail(area,"Private suspension reason",f.suspension_reason);
  putDetail(area,"Registered",date(f.created_at));
  putDetail(area,"Contact",match?match.contact_name:"Not recorded in application");
  putDetail(area,"Contact email",match?match.contact_email:"Not recorded in application");
  putDetail(area,"Expected vehicles",match&&match.expected_vehicles?match.expected_vehicles:"Not supplied");
  putDetail(area,"Fleet ID",f.id);
  el("openCompanyFleet").href="./?mode=fleet&fleet_id="+encodeURIComponent(f.id);
+ var toggle=el("toggleFleetStatus"),eligible=!isPilot(f)&&["active","suspended"].includes(f.status);
+ toggle.className=(f.status==="suspended"?"teal":"purple")+(eligible?"":" hidden");
+ toggle.textContent=f.status==="suspended"?"Reactivate fleet access":"Suspend fleet access";
+ toggle.onclick=eligible?function(){changeFleetStatus(f,toggle)}:null;
+ el("fleetStatusNote").textContent=isPilot(f)?"Internal pilot account — excluded from routine customer suspension.":f.status==="suspended"?"Fleet management suspended. Driver safety and previously uploaded records are preserved.":"Suspension affects management access only; it does not delete records or disable driver safety.";
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
 }
@@ -228,34 +238,100 @@ function copyInvitation(a){
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(message).then(function(){status("Invitation copied. You still need to send it to the customer.")}).catch(function(){window.prompt("Copy invitation",message)})}
  else window.prompt("Copy invitation",message);
 }
-function reasonInput(a,editing){
- var current=a.decline_reason||"";
- var response=window.prompt((editing?"Edit private decline reason for ":"Reason for declining ")+a.company_name+"\n(Only the ROAD 1ST owner can see this note; 3–500 characters.)",current);
- if(response===null)return null;
- var reason=response.trim();
- if(reason.length<3||reason.length>500){status("Please give a reason between 3 and 500 characters.");return null}
- return reason;
+
+var ownerDialogBusy=false;
+function ownerDialog(opts){
+ if(ownerDialogBusy)return Promise.resolve({confirmed:false});
+ ownerDialogBusy=true;opts=opts||{};
+ var box=el("ownerModal"),cancel=el("ownerModalCancel"),confirmButton=el("ownerModalConfirm"),textarea=el("ownerModalReason"),error=el("ownerModalError"),previous=document.activeElement;
+ el("ownerModalTitle").textContent=opts.title||"Confirm action";
+ el("ownerModalSubject").textContent=opts.subject||"";
+ el("ownerModalMessage").textContent=opts.message||"";
+ el("ownerModalReasonWrap").classList.toggle("hidden",!opts.requireReason);
+ el("ownerModalReasonLabel").textContent=opts.reasonLabel||"Private reason (3–500 characters)";
+ textarea.value=opts.initialReason||"";
+ error.textContent="";
+ confirmButton.textContent=opts.confirmLabel||"Confirm";
+ confirmButton.className=opts.danger?"purple":"teal";
+ box.classList.remove("hidden");
+ return new Promise(function(resolve){
+  var done=false;
+  function finish(ok,reason){
+   if(done)return;done=true;
+   box.classList.add("hidden");ownerDialogBusy=false;
+   cancel.removeEventListener("click",onCancel);
+   confirmButton.removeEventListener("click",onConfirm);
+   box.removeEventListener("click",onBackdrop);
+   document.removeEventListener("keydown",onKeys,true);
+   if(previous&&typeof previous.focus==="function")previous.focus();
+   resolve({confirmed:ok,reason:reason||""});
+  }
+  function onCancel(){finish(false,"")}
+  function onConfirm(){
+   var reason=opts.requireReason?textarea.value.trim():"";
+   if(opts.requireReason&&(reason.length<3||reason.length>500)){
+    error.textContent="Enter a reason between 3 and 500 characters.";textarea.focus();return;
+   }
+   finish(true,reason);
+  }
+  function onBackdrop(e){if(e.target===box)onCancel()}
+  function onKeys(e){
+   if(e.key==="Escape"){e.preventDefault();e.stopPropagation();onCancel()}
+   if(e.key==="Tab"){
+    var first=opts.requireReason?textarea:cancel,last=confirmButton;
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+   }
+  }
+  cancel.addEventListener("click",onCancel);
+  confirmButton.addEventListener("click",onConfirm);
+  box.addEventListener("click",onBackdrop);
+  document.addEventListener("keydown",onKeys,true);
+  (opts.requireReason?textarea:cancel).focus();
+ });
 }
+async function changeFleetStatus(f,trigger){
+ if(isPilot(f))return;
+ var suspend=f.status==="active";
+ var ans=await ownerDialog({
+  title:suspend?"Suspend fleet access":"Reactivate fleet access",subject:f.name,
+  message:suspend?"Suspend this company's Fleet Manager access? Driver safety functions remain active and data is retained for handover.":"Reactivate this company's Fleet Manager access? Confirm their trial or subscription is authorised.",
+  requireReason:suspend,reasonLabel:"Private suspension reason — e.g. non-payment",
+  confirmLabel:suspend?"Suspend access":"Reactivate",danger:suspend
+ });
+ if(!ans.confirmed)return;
+ trigger.disabled=true;
+ try{
+  await api(O,{method:"POST",body:JSON.stringify({action:"set_fleet_status",fleet_id:f.id,status:suspend?"suspended":"active",reason:ans.reason})});
+  status(suspend?"Fleet management suspended. Customer records retained.":"Fleet management reactivated.");
+  await refresh();
+ }catch(e){status("Could not change fleet status: "+e.message);trigger.disabled=false}
+}
+
 async function ownerDecision(a,action,b){
  var messages={
-  approve:"Approve "+a.company_name+" and create a private fleet account?\n\nYou will need to send the invitation separately.",
-  decline:"Decline the application for "+a.company_name+"?",
-  reconsider:"Move "+a.company_name+" back to Pending for reconsideration?",
-  clear:"Clear "+a.company_name+" from your application list?\n\nThis hides the enquiry from this list, retaining the decision record and any approved fleet account."
+  approve:"Creates a private fleet account. Payment is not verified; customer invitation must be sent separately.",
+  decline:"Record the private reason for declining this company's application.",
+  reconsider:"Return this company to Pending for a further conversation or reconsideration?",
+  clear:"Remove this application from your visible list? The decision record and any approved fleet account stay stored.",
+  save_decline_reason:"Edit the private reason saved with this declined application."
  };
+ var answer=await ownerDialog({
+  title:action==="approve"?"Approve application":action==="decline"?"Decline application":action==="reconsider"?"Return to pending":action==="clear"?"Clear application":"Edit decline reason",
+  subject:a.company_name,message:messages[action]||"Confirm this action.",
+  requireReason:action==="decline"||action==="save_decline_reason",
+  reasonLabel:"Private decline reason (3–500 characters)",
+  initialReason:a.decline_reason||"",
+  confirmLabel:action==="reconsider"?"Return to pending":action==="save_decline_reason"?"Save reason":action==="clear"?"Clear":action==="approve"?"Approve":"Decline",
+  danger:action==="decline"||action==="clear"
+ });
+ if(!answer.confirmed)return;
  var body={action:action,application_id:a.id};
- if(action==="decline"){
-  var reason=reasonInput(a,false);if(reason===null)return;
-  body.decline_reason=reason;
- }
- if(action==="save_decline_reason"){
-  var revised=reasonInput(a,true);if(revised===null)return;
-  body.decline_reason=revised;
- }else if(!window.confirm(messages[action]||"Confirm this change?"))return;
+ if(action==="decline"||action==="save_decline_reason")body.decline_reason=answer.reason;
  b.disabled=true;
  try{
   await api(O,{method:"POST",body:JSON.stringify(body)});
-  status(action==="clear"?"Application cleared from the list.":action==="reconsider"?"Application returned to Pending.":action==="approve"?"Application approved; invitation must be sent separately.":action==="decline"?"Application declined and private reason saved.":"Decline reason saved.");
+  status(action==="clear"?"Application cleared.":action==="reconsider"?"Application returned to Pending.":action==="approve"?"Application approved; invitation must be sent separately.":action==="decline"?"Application declined; private reason saved.":"Decline reason saved.");
   await refresh();
  }catch(e){status("Application update failed: "+e.message);b.disabled=false}
 }
@@ -331,7 +407,7 @@ async function refresh(){
   // The applications endpoint requires the platform owner's authenticated identity.
   // Check it before revealing the company list; fleet managers must not see this view.
   var a=await api(O+"?kind=applications");
-  var f=await api(F);
+  var f=await api(O+"?kind=fleets");
   applications=a.applications||[];fleets=f.fleets||[];
   ownerVisible(true);renderCompanies();renderApplications();
   var shown=el("companyDetail");if(!shown.classList.contains("hidden"))shown.classList.add("hidden");

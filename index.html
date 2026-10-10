@@ -484,6 +484,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     <div><label for="newVehicleType">Vehicle type</label><select id="newVehicleType"><option value="Truck">Truck</option><option value="Van + Tacho">Van + Tacho</option><option value="Car / Van">Car / Van</option><option value="Bus">Bus</option></select></div>
     <div><label for="newVehicleUnit">Fleet / unit number (optional)</label><input id="newVehicleUnit" maxlength="80" placeholder="Unit 12"></div>
     <div style="align-self:end"><button id="addFleetVehicle" class="secondary full" type="button">Add vehicle</button></div>
+    <div><button id="cancelVehicleEdit" class="secondary full hidden" type="button">Cancel edit</button></div>
   </div>
   <label for="fleetVehicleFind">Find a fleet vehicle</label>
   <input id="fleetVehicleFind" placeholder="Search registration or unit number">
@@ -990,6 +991,29 @@ async function saveWalkaroundRequirement(){
   }catch(e){status.textContent=e.message||"Could not save walkaround policy."}
   finally{button.disabled=false}
 }
+var editingFleetVehicleId=null;
+var editingFleetVehicleFleetId=null;
+function resetVehicleEdit(){
+  editingFleetVehicleId=null;
+  editingFleetVehicleFleetId=null;
+  document.getElementById("newVehicleRegistration").value="";
+  document.getElementById("newVehicleUnit").value="";
+  document.getElementById("newVehicleType").value="Truck";
+  document.getElementById("addFleetVehicle").textContent=reportT("Add vehicle");
+  document.getElementById("cancelVehicleEdit").classList.add("hidden");
+}
+function editFleetVehicle(v){
+  editingFleetVehicleId=v.id;
+  editingFleetVehicleFleetId=document.getElementById("fleetSelect").value;
+  document.getElementById("newVehicleRegistration").value=v.registration||"";
+  document.getElementById("newVehicleType").value=v.vehicle_type||"Truck";
+  document.getElementById("newVehicleUnit").value=v.unit_number||"";
+  document.getElementById("addFleetVehicle").textContent=reportT("Save changes");
+  document.getElementById("cancelVehicleEdit").classList.remove("hidden");
+  var field=document.getElementById("newVehicleRegistration");
+  field.scrollIntoView({behavior:"smooth",block:"center"});
+  field.focus();
+}
 function renderFleetVehicles(){
   var panel=document.getElementById("fleetVehicleList"),
       filter=document.getElementById("fleetVehicleFind").value.trim().toLowerCase(),
@@ -1010,10 +1034,15 @@ function renderFleetVehicles(){
     var meta=document.createElement("div");meta.className="sub";
     meta.textContent=reportT(v.vehicle_type||"Vehicle")+(v.unit_number?" · "+v.unit_number:"");
     name.appendChild(label);name.appendChild(meta);
-    var archive=document.createElement("button");archive.type="button";archive.className="secondary";
-    archive.textContent=reportT("Archive");
-    archive.onclick=function(){archiveFleetVehicle(v.id,v.registration)};
-    row.appendChild(name);row.appendChild(archive);panel.appendChild(row);
+    var actions=document.createElement("div");actions.className="compliance-actions";
+    var edit=document.createElement("button");edit.type="button";edit.className="secondary";
+    edit.textContent=reportT("Edit");
+    edit.onclick=function(){editFleetVehicle(v)};
+    var remove=document.createElement("button");remove.type="button";remove.className="secondary";
+    remove.textContent=reportT("Remove");
+    remove.onclick=function(){removeFleetVehicle(v.id,v.registration)};
+    actions.appendChild(edit);actions.appendChild(remove);
+    row.appendChild(name);row.appendChild(actions);panel.appendChild(row);
   });
   if(rows.length>100){var hint=document.createElement("div");hint.className="note";
     hint.textContent=reportT("Showing first 100. Search above to narrow the list.");panel.appendChild(hint)}
@@ -1025,29 +1054,36 @@ async function addFleetVehicle(){
       unit=document.getElementById("newVehicleUnit").value.trim(),
       button=document.getElementById("addFleetVehicle");
   if(!registration){status.textContent=reportT("Enter the vehicle registration.");return}
+  if(editingFleetVehicleId&&editingFleetVehicleFleetId!==fleetId){
+    status.textContent=reportT("Fleet changed. Select Edit again.");
+    resetVehicleEdit();return;
+  }
+  var editing=Boolean(editingFleetVehicleId);
   button.disabled=true;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
-      action:"add_vehicle",fleet_id:fleetId,registration:registration,
+      action:editing?"edit_vehicle":"add_vehicle",fleet_id:fleetId,
+      vehicle_id:editingFleetVehicleId,registration:registration,
       vehicle_type:type,unit_number:unit
     })});
-    document.getElementById("newVehicleRegistration").value="";
-    document.getElementById("newVehicleUnit").value="";
+    resetVehicleEdit();
     await loadFleet(fleetId);
-    status.textContent=reportT("Fleet vehicle added.");
-  }catch(e){status.textContent=e.message||"Could not add vehicle."}
+    status.textContent=editing?reportT("Fleet vehicle updated."):reportT("Fleet vehicle added.");
+  }catch(e){status.textContent=e.message||"Could not save vehicle."}
   finally{button.disabled=false}
 }
-async function archiveFleetVehicle(id,registration){
+async function removeFleetVehicle(id,registration){
   var fleetId=document.getElementById("fleetSelect").value;
-  if(!confirm(reportT("Archive vehicle")+": "+registration+"?"))return;
+  if(!confirm(reportT("Remove vehicle")+": "+registration+"?\n"+
+    reportT("The vehicle will be removed from this fleet register. Existing reports and receipts are kept.")))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
-      action:"archive_vehicle",fleet_id:fleetId,vehicle_id:id
+      action:"remove_vehicle",fleet_id:fleetId,vehicle_id:id
     })});
+    if(editingFleetVehicleId===id)resetVehicleEdit();
     await loadFleet(fleetId);
-    status.textContent=reportT("Vehicle archived. Existing records were not deleted.");
-  }catch(e){status.textContent=e.message||"Could not archive vehicle."}
+    status.textContent=reportT("Vehicle removed. Existing records were not deleted.");
+  }catch(e){status.textContent=e.message||"Could not remove vehicle."}
 }
 var fleetRecordItems=[];
 function fleetReportParameters(){
@@ -1305,6 +1341,7 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
 document.getElementById("addFleetVehicle").onclick=addFleetVehicle;
+document.getElementById("cancelVehicleEdit").onclick=resetVehicleEdit;
 document.getElementById("fleetVehicleFind").oninput=renderFleetVehicles;
 document.getElementById("fleetRecordSearch").onclick=searchFleetRecords;
 document.getElementById("fleetRecordGroup").onchange=renderFleetRecordRows;
@@ -1316,6 +1353,7 @@ document.getElementById("fleetRecordClear").onclick=function(){
   searchFleetRecords();
 };
 document.getElementById("fleetSelect").onchange=function(){
+  resetVehicleEdit();
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("updateQrArea").classList.add("hidden");
   loadFleet(this.value).catch(function(e){status.textContent=e.message});

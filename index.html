@@ -454,9 +454,20 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 </div>
 <div id="qrArea" class="hidden"><div id="qrMeta" class="note"></div><div id="qrSvg" class="qrbox"></div><div class="compliance-actions" style="justify-content:flex-end"><button id="closeEnrolmentQr" class="secondary" type="button">Close</button></div></div>
 
-<div class="reviewlist" id="websiteQrTest">
-  <div class="compliance-actions"><button id="showWebsiteQr" class="secondary" type="button" aria-expanded="false">Website QR test</button></div>
-  <div id="websiteQrArea" class="hidden"><div id="websiteQrSvg" class="qrbox"></div></div>
+<div class="reviewlist" id="websiteQrShare">
+  <strong>Website QR</strong>
+  <div class="note">This QR opens the ROAD 1ST website; it does not enrol drivers.</div>
+  <div class="compliance-actions"><button id="showWebsiteQr" class="secondary" type="button" aria-expanded="false" aria-controls="websiteQrArea">Preview</button></div>
+  <div id="websiteQrArea" class="hidden">
+    <div id="websiteQrSvg" class="qrbox"></div>
+    <div class="note" style="text-align:center"><a id="websiteQrLink" target="_blank" rel="noopener noreferrer"></a></div>
+    <div class="compliance-actions">
+      <button id="downloadWebsiteQr" class="teal" type="button">Download</button>
+      <button id="shareWebsiteQr" class="secondary" type="button">Share</button>
+      <button id="copyWebsiteQrLink" class="secondary" type="button">Copy link</button>
+      <button id="closeWebsiteQr" class="secondary" type="button">Close</button>
+    </div>
+  </div>
 </div>
 <div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
 <div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
@@ -709,7 +720,16 @@ document.getElementById("createEnrolment").onclick=createFleetEnrolment;
 document.getElementById("closeEnrolmentQr").onclick=function(){document.getElementById("qrArea").classList.add("hidden");document.getElementById("qrSvg").textContent="";document.getElementById("qrMeta").textContent="";};
 
 (function(){
+  "use strict";
+  var websiteUrl="https://r1st.ie/";
   var qrRows=["1111111011000110101111111","1000001001000111001000001","1011101001001010001011101","1011101010111000101011101","1011101011010000001011101","1000001010011000101000001","1111111010101010101111111","0000000011100100000000000","1000101110010101011111001","1100110110111111010111010","0010001000101001010011100","0100010111110011000000110","1101001000110110011001111","1111100100001001110010010","0001011010111111010111100","0000000111010101101110110","1110101011101101111111100","0000000011000110100010000","1111111010000000101010000","1000001001101010100011110","1011101010110110111111101","1011101000101000111100111","1011101000011110001001010","1000001001010101000111110","1111111010001100001000111"];
+  var qrArea=document.getElementById("websiteQrArea");
+  var qrButton=document.getElementById("showWebsiteQr");
+  var websiteLink=document.getElementById("websiteQrLink");
+  websiteLink.href=websiteUrl;
+  websiteLink.textContent=websiteUrl;
+
+  // Same QR matrix that passed the initial phone-camera test.
   var path="";
   qrRows.forEach(function(row,y){
     for(var x=0;x<25;){
@@ -719,13 +739,93 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
       path+="M"+(start+4)+" "+(y+4)+"h"+(x-start)+"v1h-"+(x-start)+"z";
     }
   });
-  document.getElementById("websiteQrSvg").innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" role="img" aria-label="ROAD 1ST website test QR code"><rect width="33" height="33" fill="#fff"/><path d="'+path+'" fill="#000"/></svg>';
-  document.getElementById("showWebsiteQr").onclick=function(){
-    var area=document.getElementById("websiteQrArea");
-    area.classList.toggle("hidden");
-    this.setAttribute("aria-expanded",String(!area.classList.contains("hidden")));
+  document.getElementById("websiteQrSvg").innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" role="img" aria-label="ROAD 1ST website QR code"><rect width="33" height="33" fill="#fff"/><path d="'+path+'" fill="#000"/></svg>';
+
+  function translate(value){
+    return window.ROAD1ST_PORTAL_LANGUAGE?window.ROAD1ST_PORTAL_LANGUAGE.translate(value):value;
+  }
+  qrButton.onclick=function(){
+    qrArea.classList.remove("hidden");
+    qrButton.setAttribute("aria-expanded","true");
   };
-})();
+  document.getElementById("closeWebsiteQr").onclick=function(){
+    qrArea.classList.add("hidden");
+    qrButton.setAttribute("aria-expanded","false");
+  };
+
+  function renderWebsiteQrPng(){
+    var scale=16, canvas=document.createElement("canvas");
+    canvas.width=canvas.height=33*scale;
+    var ctx=canvas.getContext("2d");
+    if(!ctx)throw Error("Canvas unavailable.");
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#000000";
+    qrRows.forEach(function(row,y){
+      for(var x=0;x<row.length;x++){
+        if(row.charAt(x)==="1")ctx.fillRect((x+4)*scale,(y+4)*scale,scale,scale);
+      }
+    });
+    return new Promise(function(resolve,reject){
+      canvas.toBlob(function(blob){blob?resolve(blob):reject(Error("PNG unavailable."));},"image/png");
+    });
+  }
+  document.getElementById("downloadWebsiteQr").onclick=async function(){
+    var btn=this;
+    btn.disabled=true;
+    try{
+      var blob=await renderWebsiteQrPng(),url=URL.createObjectURL(blob);
+      var anchor=document.createElement("a");
+      anchor.href=url;
+      anchor.download="ROAD-1ST-website-QR.png";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(function(){URL.revokeObjectURL(url);},10000);
+    }catch(e){window.alert(e.message||"Download unavailable.");}
+    finally{btn.disabled=false;}
+  };
+
+  async function copyWebsiteLink(){
+    var copied=false;
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(websiteUrl);
+        copied=true;
+      }
+    }catch(e){}
+    if(!copied){
+      var input=document.createElement("textarea");
+      input.value=websiteUrl;
+      input.style.position="fixed";
+      input.style.opacity="0";
+      document.body.appendChild(input);
+      input.focus();
+      input.select();
+      try{copied=document.execCommand("copy");}catch(e){}
+      input.remove();
+    }
+    if(copied)status.textContent=translate("Link copied.");
+    else window.prompt(translate("Copy link"),websiteUrl);
+  }
+  document.getElementById("copyWebsiteQrLink").onclick=copyWebsiteLink;
+  document.getElementById("shareWebsiteQr").onclick=async function(){
+    if(!navigator.share){await copyWebsiteLink();return;}
+    try{
+      var blob=await renderWebsiteQrPng();
+      var file=new File([blob],"ROAD-1ST-website-QR.png",{type:"image/png"});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:"ROAD 1ST",text:websiteUrl});
+      }else{
+        await navigator.share({title:"ROAD 1ST",url:websiteUrl});
+      }
+    }catch(e){
+      if(e&&e.name==="AbortError")return;
+      try{await navigator.share({title:"ROAD 1ST",url:websiteUrl});}
+      catch(error){if(!error||error.name!=="AbortError")await copyWebsiteLink();}
+    }
+  };
+})();;
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("fleetSelect").onchange=function(){
   document.getElementById("qrArea").classList.add("hidden");

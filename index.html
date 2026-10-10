@@ -465,6 +465,19 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   </div>
   <div id="fleetFuelCardList" class="note">No fuel cards configured.</div>
 </div>
+<div class="reviewlist" id="fleetVehicleRegister">
+  <strong>Fleet vehicles</strong>
+  <div class="note">Add the registrations used by this fleet, including trucks, vans, cars and buses. This does not assign old reports to a vehicle.</div>
+  <div class="fleetgrid">
+    <div><label for="newVehicleRegistration">Registration</label><input id="newVehicleRegistration" maxlength="32" placeholder="131D11111"></div>
+    <div><label for="newVehicleType">Vehicle type</label><select id="newVehicleType"><option value="Truck">Truck</option><option value="Van + Tacho">Van + Tacho</option><option value="Car / Van">Car / Van</option><option value="Bus">Bus</option></select></div>
+    <div><label for="newVehicleUnit">Fleet / unit number (optional)</label><input id="newVehicleUnit" maxlength="80" placeholder="Unit 12"></div>
+    <div style="align-self:end"><button id="addFleetVehicle" class="secondary full" type="button">Add vehicle</button></div>
+  </div>
+  <label for="fleetVehicleFind">Find a fleet vehicle</label>
+  <input id="fleetVehicleFind" placeholder="Search registration or unit number">
+  <div id="fleetVehicleList" class="note">No vehicles registered.</div>
+</div>
 <div class="fleetgrid">
 <div><label>Driver name</label><input id="newDriverName" placeholder="Driver name"></div>
 <div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
@@ -769,6 +782,7 @@ function renderFleet(d){
     archive.onclick=function(){archiveFleetFuelCard(card.id,card.label)};
     line.appendChild(name);line.appendChild(archive);fuelList.appendChild(line);
   });
+  renderFleetVehicles();
   var drivers={};(d.drivers||[]).forEach(function(x){drivers[x.id]=x.display_name});
   var list=document.getElementById("deviceList"),devices=d.devices||[];
   list.textContent="";
@@ -905,6 +919,65 @@ async function saveWalkaroundRequirement(){
     await loadFleet(fleetId);
   }catch(e){status.textContent=e.message||"Could not save walkaround policy."}
   finally{button.disabled=false}
+}
+function renderFleetVehicles(){
+  var panel=document.getElementById("fleetVehicleList"),
+      filter=document.getElementById("fleetVehicleFind").value.trim().toLowerCase(),
+      rows=(fleetData&&fleetData.vehicles||[]).filter(function(v){return v.active});
+  if(filter)rows=rows.filter(function(v){
+    return (String(v.registration||"")+" "+String(v.unit_number||"")+" "+String(v.vehicle_type||""))
+      .toLowerCase().indexOf(filter)>=0;
+  });
+  panel.textContent="";
+  var count=document.createElement("div");count.className="sub";
+  count.textContent=rows.length+" "+reportT("vehicles");
+  panel.appendChild(count);
+  if(!rows.length){var empty=document.createElement("div");empty.textContent=reportT("No matching vehicles.");panel.appendChild(empty);return}
+  rows.slice(0,100).forEach(function(v){
+    var row=document.createElement("div");row.className="device";
+    var name=document.createElement("div");
+    var label=document.createElement("strong");label.textContent=v.registration;
+    var meta=document.createElement("div");meta.className="sub";
+    meta.textContent=reportT(v.vehicle_type||"Vehicle")+(v.unit_number?" · "+v.unit_number:"");
+    name.appendChild(label);name.appendChild(meta);
+    var archive=document.createElement("button");archive.type="button";archive.className="secondary";
+    archive.textContent=reportT("Archive");
+    archive.onclick=function(){archiveFleetVehicle(v.id,v.registration)};
+    row.appendChild(name);row.appendChild(archive);panel.appendChild(row);
+  });
+  if(rows.length>100){var hint=document.createElement("div");hint.className="note";
+    hint.textContent=reportT("Showing first 100. Search above to narrow the list.");panel.appendChild(hint)}
+}
+async function addFleetVehicle(){
+  var fleetId=document.getElementById("fleetSelect").value,
+      registration=document.getElementById("newVehicleRegistration").value.trim(),
+      type=document.getElementById("newVehicleType").value,
+      unit=document.getElementById("newVehicleUnit").value.trim(),
+      button=document.getElementById("addFleetVehicle");
+  if(!registration){status.textContent=reportT("Enter the vehicle registration.");return}
+  button.disabled=true;
+  try{
+    await api(F,{method:"POST",body:JSON.stringify({
+      action:"add_vehicle",fleet_id:fleetId,registration:registration,
+      vehicle_type:type,unit_number:unit
+    })});
+    document.getElementById("newVehicleRegistration").value="";
+    document.getElementById("newVehicleUnit").value="";
+    await loadFleet(fleetId);
+    status.textContent=reportT("Fleet vehicle added.");
+  }catch(e){status.textContent=e.message||"Could not add vehicle."}
+  finally{button.disabled=false}
+}
+async function archiveFleetVehicle(id,registration){
+  var fleetId=document.getElementById("fleetSelect").value;
+  if(!confirm(reportT("Archive vehicle")+": "+registration+"?"))return;
+  try{
+    await api(F,{method:"POST",body:JSON.stringify({
+      action:"archive_vehicle",fleet_id:fleetId,vehicle_id:id
+    })});
+    await loadFleet(fleetId);
+    status.textContent=reportT("Vehicle archived. Existing records were not deleted.");
+  }catch(e){status.textContent=e.message||"Could not archive vehicle."}
 }
 async function addFleetFuelCard(){
   var fleetId=document.getElementById("fleetSelect").value,
@@ -1063,6 +1136,8 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
 })();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
+document.getElementById("addFleetVehicle").onclick=addFleetVehicle;
+document.getElementById("fleetVehicleFind").oninput=renderFleetVehicles;
 document.getElementById("fleetSelect").onchange=function(){
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("updateQrArea").classList.add("hidden");

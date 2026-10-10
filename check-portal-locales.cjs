@@ -60,6 +60,10 @@ assert.ok(html.includes('return reportT(m[e]||words(e))'), "event code mapped to
 assert.ok(html.includes('return reportT(m[v]||words(v))'), "control code mapped to translated label");
 assert.ok(html.includes('F=P+"/functions/v1/road1st-fleet-admin-api"'), "original fleet API retained");
 assert.ok(html.includes('A=P+"/functions/v1/road1st-admin-api"'), "original report API retained");
+const inlineScripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)]
+  .map(match => match[1]).filter(script => script.trim());
+assert.ok(inlineScripts.length, "portal inline script exists");
+for (const script of inlineScripts) new vm.Script(script, { filename: "ROAD1ST Admin inline script" });
 const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="portal-translations.js"'))
   .replace(/<img[^>]*>/g, "")
   .replace(/<[^>]+>/g, "|")

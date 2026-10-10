@@ -1409,11 +1409,12 @@ document.getElementById("pilotApkFile").onchange=function(){
       match=/^ROAD1ST-(\d+\.\d+(?:\.\d+)?)-pilot\.apk$/i.exec(filename),
       versionName=document.getElementById("pilotVersionName"),
       versionCode=document.getElementById("pilotVersionCode");
-  // A file name does not usually contain Android's internal versionCode.
-  // Use 102 only for the signed, already verified 2.99.3 pilot build.
+  // The filename alone cannot confirm Android's internal versionCode.
+  // Only auto-fill codes for builds verified in our signed pilot workflow.
   if(match){
     versionName.value=match[1]+"-pilot";
-    if(match[1]==="2.99.3")versionCode.value="102";
+    if(match[1]==="2.99.4")versionCode.value="103";
+    else if(match[1]==="2.99.3")versionCode.value="102";
     else if(/^\d+\.\d+$/.test(match[1]))versionCode.value=match[1].split(".")[1];
     else versionCode.value="";
   }else{

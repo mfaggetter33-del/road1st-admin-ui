@@ -404,7 +404,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div id="status" class="status"></div>
 <div id="reportFilters" class="report-filters hidden" aria-label="Report organisation">
   <label for="reportGroup">Group by
-    <select id="reportGroup"><option value="day">Day</option><option value="week">Week</option></select>
+    <select id="reportGroup"><option value="day">Day</option><option value="week">Week</option><option value="registration">Vehicle registration</option></select>
   </label>
   <label for="reportCategory">Category
     <select id="reportCategory"><option value="all">All categories</option>
@@ -416,6 +416,17 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
       <option value="Other">Other</option>
     </select>
   </label>
+  <label for="reportRegistration">Registration
+    <input id="reportRegistration" maxlength="32" placeholder="131D11111">
+  </label>
+  <label for="reportDateFrom">From
+    <input id="reportDateFrom" type="date">
+  </label>
+  <label for="reportDateTo">To
+    <input id="reportDateTo" type="date">
+  </label>
+  <button id="searchReports" class="teal" type="button">Search</button>
+  <button id="clearReportSearch" class="secondary" type="button">Clear</button>
   <div id="reportCount" class="report-count" aria-live="polite"></div>
 </div>
 <div id="recordsTable" class="table"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
@@ -709,14 +720,17 @@ function renderReportGroups(){
   var filtered=reportItems.filter(function(x){return category==="all"||(x.category||"Other")===category});
   document.getElementById("reportCount").textContent=filtered.length+" / "+reportTotal+" · "+reportT("Reports");
   body.textContent="";
-  headers(["Received","Category","App","File","Lines","Size","View","Download"]);
+  headers(["Received","Vehicle Reg","Category","App","File","Lines","Size","View","Download"]);
   if(!filtered.length){
-    var empty=document.createElement("tr"),td=document.createElement("td");td.colSpan=8;
-    td.textContent=reportT("No reports in this category.");empty.appendChild(td);body.appendChild(empty);return;
+    var empty=document.createElement("tr"),td=document.createElement("td");td.colSpan=9;
+    td.textContent=reportT("No matching reports.");empty.appendChild(td);body.appendChild(empty);return;
   }
   var buckets=new Map();
   filtered.forEach(function(x){
-    var g=reportBucket(x.created_at,grouping);
+    var firstReg=(x.registrations||[])[0]||"";
+    var g=grouping==="registration"
+      ?{key:firstReg||"unassigned",label:firstReg||reportT("Unassigned registration")}
+      :reportBucket(x.client_created_at||x.created_at,grouping);
     if(!buckets.has(g.key))buckets.set(g.key,{label:g.label,items:[]});
     buckets.get(g.key).items.push(x);
   });
@@ -724,7 +738,7 @@ function renderReportGroups(){
   buckets.forEach(function(g,key){
     var groupRow=document.createElement("tr"),groupCell=document.createElement("td"),toggle=document.createElement("button");
     var opened=reportOpenGroups.has(key),entries=[];
-    groupRow.className="report-group";groupCell.colSpan=8;
+    groupRow.className="report-group";groupCell.colSpan=9;
     toggle.type="button";toggle.setAttribute("aria-expanded",String(opened));
     toggle.textContent=(opened?"▾ ":"▸ ")+g.label+" · "+g.items.length+" "+reportT(g.items.length===1?"report":"reports");
     toggle.onclick=function(){
@@ -737,17 +751,32 @@ function renderReportGroups(){
     groupCell.appendChild(toggle);groupRow.appendChild(groupCell);body.appendChild(groupRow);
     g.items.forEach(function(x){
       var tr=document.createElement("tr");tr.className="report-entry";tr.hidden=!opened;
-      cell(tr,date(x.created_at));cell(tr,x.category||"Other");cell(tr,x.app_version);
+      cell(tr,date(x.client_created_at||x.created_at));cell(tr,(x.registrations||[]).join(", ")||"—");cell(tr,x.category||"Other");cell(tr,x.app_version);
       cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));
       viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);
       body.appendChild(tr);entries.push(tr);
     });
   });
 }
+function reportSearchParams(){
+  var reg=document.getElementById("reportRegistration").value.trim(),
+      from=document.getElementById("reportDateFrom").value,
+      to=document.getElementById("reportDateTo").value;
+  if(from&&to&&from>to)throw Error(reportT("Start date must not be after end date."));
+  var params=new URLSearchParams();
+  if(reg)params.set("registration",reg);
+  if(from)params.set("after",new Date(from+"T00:00:00").toISOString());
+  if(to){
+    var d=new Date(to+"T00:00:00");d.setDate(d.getDate()+1);
+    params.set("before",d.toISOString());
+  }
+  return params.toString();
+}
 async function loadReportPages(){
-  var all=[],total=0;
+  var all=[],total=0,filter=reportSearchParams();
   for(var pass=0;pass<100;pass++){
-    var page=await api(A+"?kind=reports&limit=100&offset="+all.length);
+    var page=await api(A+"?kind=reports&limit=100&offset="+all.length+
+      (filter?"&"+filter:""));
     var incoming=page.items||[];
     total=Number(page.total||0);
     if(!incoming.length)break;
@@ -756,6 +785,15 @@ async function loadReportPages(){
   }
   return {items:all,total:total};
 }
+document.getElementById("searchReports").onclick=function(){
+  load("reports").catch(function(e){status.textContent=e.message||"Report search failed."});
+};
+document.getElementById("clearReportSearch").onclick=function(){
+  ["reportRegistration","reportDateFrom","reportDateTo"].forEach(function(id){
+    document.getElementById(id).value="";
+  });
+  load("reports").catch(function(e){status.textContent=e.message||"Could not clear search."});
+};
 reportGroupSelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
 reportCategorySelect.onchange=function(){reportOpenGroups.clear();renderReportGroups()};
 document.addEventListener("road1st-portal-language-change",function(){if(C==="reports"&&reportItems.length)renderReportGroups()});

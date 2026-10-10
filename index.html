@@ -503,9 +503,42 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   <strong>Fleet fuel cards</strong>
   <div class="note">Enter the fuel card providers this fleet uses. Only active providers appear in drivers' Fuel Receipt dropdowns. Do not enter card numbers or PINs.</div>
   <div class="fleetgrid">
-    <div><label for="newFuelCardName">Fuel card provider</label><input id="newFuelCardName" maxlength="80" placeholder="e.g. DKV, Circle K"></div>
+    <div>
+      <label for="fleetFuelCardProvider">Fuel card provider</label>
+      <select id="fleetFuelCardProvider">
+        <option value="">Choose a fuel card provider</option>
+        <option value="AS24">AS24</option>
+        <option value="Allstar">Allstar</option>
+        <option value="Andamur">Andamur</option>
+        <option value="Aral">Aral</option>
+        <option value="BP Plus">BP Plus</option>
+        <option value="Circle K">Circle K</option>
+        <option value="DKV Mobility">DKV Mobility</option>
+        <option value="E100">E100</option>
+        <option value="Eni">Eni</option>
+        <option value="Esso Card">Esso Card</option>
+        <option value="Eurowag">Eurowag</option>
+        <option value="Keyfuels">Keyfuels</option>
+        <option value="Moeve">Moeve</option>
+        <option value="OMV">OMV</option>
+        <option value="ORLEN">ORLEN</option>
+        <option value="Q8">Q8</option>
+        <option value="Radius">Radius</option>
+        <option value="Shell Card">Shell Card</option>
+        <option value="TotalEnergies">TotalEnergies</option>
+        <option value="UK Fuels">UK Fuels</option>
+        <option value="UTA Edenred">UTA Edenred</option>
+        <option value="VIALTIS">VIALTIS</option>
+        <option value="__manual__">Other / manual entry</option>
+      </select>
+    </div>
+    <div id="fleetFuelCardManual" class="hidden">
+      <label for="newFuelCardName">Enter provider name</label>
+      <input id="newFuelCardName" maxlength="80" placeholder="e.g. Local fuel-card provider">
+    </div>
     <div style="align-self:end"><button id="addFleetFuelCard" class="secondary full" type="button">Add fuel card</button></div>
   </div>
+  <div id="fleetFuelCardFeedback" class="note" role="status" aria-live="polite"></div>
   <div id="fleetFuelCardList" class="note">No fuel cards configured.</div>
 </div>
 <div class="reviewlist" id="fleetVehicleRegister">
@@ -1282,18 +1315,43 @@ async function previewFleetImage(item){
     imagePreviewDownload.onclick=function(){downloadFleetFile(item).catch(function(e){status.textContent=e.message})};
   }catch(e){imagePreviewBody.textContent=e.message||"Preview unavailable."}
 }
+function fuelCardProviderSelectionChanged(){
+  var dropdown=document.getElementById("fleetFuelCardProvider"),
+      manual=document.getElementById("fleetFuelCardManual"),
+      isManual=dropdown.value==="__manual__";
+  manual.classList.toggle("hidden",!isManual);
+  document.getElementById("fleetFuelCardFeedback").textContent="";
+  if(isManual)document.getElementById("newFuelCardName").focus();
+}
+function fuelCardSaveError(error){
+  var raw=error&&error.message||"";
+  if(raw==="fuel_card_already_exists")return reportT("This fuel card is already on the fleet list.");
+  if(raw==="invalid_fuel_card_name")return reportT("Enter a valid fuel card provider name.");
+  if(raw==="manager_required")return reportT("A fleet manager must add fuel cards.");
+  return reportT("Could not add fuel card.")+(raw?" ("+raw+")":"");
+}
 async function addFleetFuelCard(){
   var fleetId=document.getElementById("fleetSelect").value,
+      select=document.getElementById("fleetFuelCardProvider"),
       field=document.getElementById("newFuelCardName"),
-      name=field.value.trim(),button=document.getElementById("addFleetFuelCard");
-  if(!name){status.textContent=reportT("Enter a fuel card provider.");return}
+      feedback=document.getElementById("fleetFuelCardFeedback"),
+      button=document.getElementById("addFleetFuelCard"),
+      value=select.value,
+      name=value==="__manual__"?field.value.trim():value;
+  feedback.textContent="";
+  if(!value){feedback.textContent=reportT("Choose a provider or enter one manually.");select.focus();return}
+  if(!name){feedback.textContent=reportT("Enter a valid fuel card provider name.");field.focus();return}
   button.disabled=true;
   try{
-    await api(F,{method:"POST",body:JSON.stringify({action:"add_fuel_card",fleet_id:fleetId,label:name})});
+    await api(F,{method:"POST",body:JSON.stringify({
+      action:"add_fuel_card",fleet_id:fleetId,label:name
+    })});
+    select.value="";
     field.value="";
+    fuelCardProviderSelectionChanged();
     await loadFleet(fleetId);
-    status.textContent=reportT("Fuel card added. Driver phones receive the choices when they refresh.");
-  }catch(e){status.textContent=e.message||"Could not add fuel card."}
+    feedback.textContent=reportT("Fuel card added. Driver phones receive the choices when they refresh.");
+  }catch(e){feedback.textContent=fuelCardSaveError(e)}
   finally{button.disabled=false}
 }
 async function archiveFleetFuelCard(cardId,name){
@@ -1449,6 +1507,7 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
 })();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
+document.getElementById("fleetFuelCardProvider").onchange=fuelCardProviderSelectionChanged;
 document.getElementById("addFleetVehicle").onclick=addFleetVehicle;
 document.getElementById("cancelVehicleEdit").onclick=resetVehicleEdit;
 document.getElementById("fleetVehicleFind").oninput=renderFleetVehicles;

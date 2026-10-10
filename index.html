@@ -376,6 +376,38 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 #fleetPanel,#compliancePanel{margin-top:12px}
 @media(max-width:950px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:720px){.stats{grid-template-columns:1fr}.formgrid,.fleetgrid{grid-template-columns:1fr}.device{grid-template-columns:1fr}}
+
+/* Branded ROAD 1ST confirmations: replaces browser-native dialogs. */
+.road1st-confirm-backdrop{
+  position:fixed;inset:0;z-index:2000;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  background:rgba(3,6,12,.88);backdrop-filter:blur(6px);
+}
+.road1st-confirm-card{
+  width:min(480px,100%);
+  background:linear-gradient(155deg,#171f2b,#0a0e14);
+  border:1px solid rgba(124,58,237,.65);
+  border-radius:22px;padding:23px;
+  box-shadow:0 30px 85px rgba(0,0,0,.75);
+}
+.road1st-confirm-brand{display:flex;gap:12px;align-items:center;margin-bottom:19px}
+.road1st-confirm-logo{
+  width:54px;height:54px;object-fit:contain;border-radius:12px;
+  background:#080b10;border:1px solid var(--border);
+}
+.road1st-confirm-brandname{font-size:15px;font-weight:900;letter-spacing:.1em}
+.road1st-confirm-kicker{font-size:11px;color:var(--teal);letter-spacing:.1em;font-weight:750}
+.road1st-confirm-card h2{font-size:22px;line-height:1.25;margin:0 0 12px}
+.road1st-confirm-subject{
+  color:var(--teal);font-weight:800;font-size:17px;overflow-wrap:anywhere;
+  margin-bottom:12px;
+}
+.road1st-confirm-message{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 23px}
+.road1st-confirm-actions{display:flex;justify-content:flex-end;gap:11px;flex-wrap:wrap}
+.road1st-confirm-actions button{min-width:110px}
+.road1st-confirm-actions button:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+@media(max-width:520px){.road1st-confirm-actions{flex-direction:column-reverse}.road1st-confirm-actions button{width:100%}}
 </style>
 </head>
 <body>
@@ -598,6 +630,23 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
       </div>
     </div>
     <div id="imagePreviewBody" class="image-preview-body"><div class="image-preview-loading">Loading image…</div></div>
+  </div>
+</div>
+<div id="road1stConfirm" class="road1st-confirm-backdrop hidden" role="alertdialog" aria-modal="true"
+     aria-labelledby="road1stConfirmTitle" aria-describedby="road1stConfirmMessage">
+  <div class="road1st-confirm-card">
+    <div class="road1st-confirm-brand">
+      <img id="road1stConfirmLogo" class="road1st-confirm-logo" alt="">
+      <div><div class="road1st-confirm-brandname">ROAD 1ST</div>
+           <div class="road1st-confirm-kicker">FLEET PORTAL</div></div>
+    </div>
+    <h2 id="road1stConfirmTitle"></h2>
+    <div id="road1stConfirmSubject" class="road1st-confirm-subject"></div>
+    <p id="road1stConfirmMessage" class="road1st-confirm-message"></p>
+    <div class="road1st-confirm-actions">
+      <button id="road1stConfirmCancel" class="secondary" type="button"></button>
+      <button id="road1stConfirmAction" type="button"></button>
+    </div>
   </div>
 </div>
 <script src="portal-translations.js"></script>
@@ -1072,10 +1121,60 @@ async function addFleetVehicle(){
   }catch(e){status.textContent=e.message||"Could not save vehicle."}
   finally{button.disabled=false}
 }
+// ROAD 1ST confirmation box. Cancel, Escape and clicking outside are always safe.
+var road1stConfirmBusy=false;
+function confirmRoad1st(title,subject,message,action){
+  if(road1stConfirmBusy)return Promise.resolve(false);
+  road1stConfirmBusy=true;
+  return new Promise(function(resolve){
+    var overlay=document.getElementById("road1stConfirm"),
+        cancel=document.getElementById("road1stConfirmCancel"),
+        approve=document.getElementById("road1stConfirmAction"),
+        subjectEl=document.getElementById("road1stConfirmSubject"),
+        messageEl=document.getElementById("road1stConfirmMessage"),
+        previous=document.activeElement,
+        finished=false;
+    document.getElementById("road1stConfirmLogo").src=
+      document.querySelector(".brand-logo").src;
+    document.getElementById("road1stConfirmTitle").textContent=reportT(title);
+    subjectEl.textContent=subject||"";
+    subjectEl.hidden=!subject;
+    messageEl.textContent=message?reportT(message):"";
+    messageEl.hidden=!message;
+    cancel.textContent=reportT("Cancel");
+    approve.textContent=reportT(action);
+    function finish(result){
+      if(finished)return;
+      finished=true;
+      overlay.classList.add("hidden");
+      overlay.removeEventListener("click",outside);
+      document.removeEventListener("keydown",keys,true);
+      cancel.onclick=null;approve.onclick=null;
+      road1stConfirmBusy=false;
+      if(previous&&typeof previous.focus==="function")previous.focus();
+      resolve(result);
+    }
+    function outside(event){if(event.target===overlay)finish(false)}
+    function keys(event){
+      if(event.key==="Escape"){event.preventDefault();event.stopPropagation();finish(false)}
+      if(event.key==="Tab"){
+        var first=cancel,last=approve;
+        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+        else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+      }
+    }
+    cancel.onclick=function(){finish(false)};
+    approve.onclick=function(){finish(true)};
+    overlay.addEventListener("click",outside);
+    document.addEventListener("keydown",keys,true);
+    overlay.classList.remove("hidden");
+    cancel.focus();
+  });
+}
 async function removeFleetVehicle(id,registration){
   var fleetId=document.getElementById("fleetSelect").value;
-  if(!confirm(reportT("Remove vehicle")+": "+registration+"?\n"+
-    reportT("The vehicle will be removed from this fleet register. Existing reports and receipts are kept.")))return;
+  if(!await confirmRoad1st("Remove vehicle",registration,
+    "The vehicle will be removed from this fleet register. Existing reports and receipts are kept.","Remove"))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
       action:"remove_vehicle",fleet_id:fleetId,vehicle_id:id
@@ -1199,7 +1298,7 @@ async function addFleetFuelCard(){
 }
 async function archiveFleetFuelCard(cardId,name){
   var fleetId=document.getElementById("fleetSelect").value;
-  if(!confirm(reportT("Archive fuel card")+": "+name+"?"))return;
+  if(!await confirmRoad1st("Archive fuel card",name,"","Archive"))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
       action:"archive_fuel_card",fleet_id:fleetId,fuel_card_id:cardId
@@ -1208,7 +1307,17 @@ async function archiveFleetFuelCard(cardId,name){
     status.textContent=reportT("Fuel card archived. Existing receipts remain unchanged.");
   }catch(e){status.textContent=e.message||"Could not archive fuel card."}
 }
-async function revokeFleetDevice(deviceId){var fleetId=document.getElementById("fleetSelect").value;if(!confirm(window.ROAD1ST_PORTAL_LANGUAGE?window.ROAD1ST_PORTAL_LANGUAGE.translate("Revoke this phone from the fleet?"):"Revoke this phone from the fleet?"))return;try{await api(F,{method:"POST",body:JSON.stringify({action:"revoke_device",fleet_id:fleetId,device_id:deviceId})});status.textContent="Phone revoked.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not revoke phone."}}
+async function revokeFleetDevice(deviceId){
+  var fleetId=document.getElementById("fleetSelect").value;
+  if(!await confirmRoad1st("Revoke this phone from the fleet?","","","Revoke"))return;
+  try{
+    await api(F,{method:"POST",body:JSON.stringify({
+      action:"revoke_device",fleet_id:fleetId,device_id:deviceId
+    })});
+    status.textContent="Phone revoked.";
+    await loadFleet(fleetId);
+  }catch(e){status.textContent=e.message||"Could not revoke phone."}
+}
 function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres",reportT("Fuel Card"),"Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.fuel_card||"—");previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
 async function load(k){C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value);try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent=reportT("Reports")+": "+reportItems.length+" / "+reportTotal+" · "+reportT("Category");return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent=reportT(k==="fuel"?"Fuel receipts":"Defect photos")+": "+(d.items||[]).length+" / "+d.total}
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}

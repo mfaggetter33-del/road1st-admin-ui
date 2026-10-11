@@ -5,6 +5,11 @@ on:
       - feature/owner-fleet-inspection-20261011
     paths:
       - .github/workflows/check-owner-staging-preview.yml
+  pull_request:
+    branches:
+      - feature/secure-driver-replacement-20261011
+    paths:
+      - .github/workflows/check-owner-staging-preview.yml
   workflow_dispatch:
 permissions:
   contents: read

@@ -133,6 +133,13 @@ button:disabled{opacity:.55;cursor:default;transform:none}
   color:var(--bg);
 }
 .full{width:100%;margin-top:12px}
+.fleet-custom-apps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:340px;overflow:auto;padding:10px 0}
+.fleet-custom-app{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;min-width:0;border-radius:10px;background:var(--surface-alt);border:1px solid var(--border)}
+.fleet-custom-app span{overflow-wrap:anywhere;font-size:13px}
+.fleet-custom-app button{flex-shrink:0;min-width:82px;font-size:12px;padding:7px 10px}
+.fleet-custom-app button.blocked{background:var(--danger);color:white;border-color:var(--danger)}
+.fleet-custom-app button.allowed{background:var(--teal);color:var(--bg);border-color:var(--teal)}
+@media(max-width:720px){.fleet-custom-apps{grid-template-columns:1fr}}
 .hidden{display:none!important}
 .error{color:var(--danger);min-height:20px;margin-top:12px;font-size:13px;line-height:1.45}
 .toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:15px}
@@ -535,7 +542,15 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div class="sub">Register ROAD 1ST phones to a fleet with a 30-minute, single-use QR code. The QR does not contain an admin password or permanent company secret.</div>
 <div class="fleetgrid">
 <div><label>Fleet</label><select id="fleetSelect"></select></div>
-<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Recommended">Recommended</option><option value="Strict">Strict</option></select></div>
+<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Recommended">Recommended</option><option value="Strict">Strict</option><option value="Custom">Custom</option></select></div>
+</div>
+<div id="fleetCustomAppsArea" class="hidden">
+  <div id="fleetCustomNotice" class="note"></div>
+  <div id="fleetCustomApps" class="fleet-custom-apps"></div>
+  <div class="fleetgrid">
+    <div><label for="fleetCustomNewApp">Android package ID (other work app)</label><input id="fleetCustomNewApp" placeholder="com.example.workapp" autocomplete="off"></div>
+    <div style="align-self:end"><button id="fleetCustomAdd" class="secondary full" type="button">Add app</button></div>
+  </div>
 </div>
 <div class="compliance-actions"><button id="saveFleetPreset" class="secondary">Save fleet policy</button></div>
 <div class="fleetgrid">
@@ -1164,6 +1179,107 @@ document.getElementById("refreshApplications").onclick=loadApplications;
 function val(id,v){document.getElementById(id).value=v||""}
 function renderCompliance(d){var p=d.profile||{};val("organisationName",p.organisation_name||"ROAD 1ST");val("ownerName",p.owner_name);val("ownerEmail",p.owner_email);val("ownerPhone",p.owner_phone);val("complianceName",p.compliance_contact_name);val("complianceEmail",p.compliance_contact_email);val("technicalName",p.technical_contact_name);val("technicalEmail",p.technical_contact_email);val("privacyEmail",p.privacy_contact_email);val("playEmail",p.play_console_contact_email);val("complianceNotes",p.notes);document.getElementById("routeAll").checked=p.route_all_notifications_to_owner!==false;document.getElementById("complianceMeta").textContent=p.updated_at?"Last updated "+date(p.updated_at)+".":"";var list=document.getElementById("reviewList"),reviews=d.reviews||[];list.textContent="";if(!reviews.length){list.textContent="No reviews recorded yet.";return}reviews.forEach(function(r){var x=document.createElement("div");x.className="reviewitem";var b=document.createElement("b");b.textContent=(r.review_type||"Compliance review")+" · "+String(r.status||"").replace(/_/g," ");var s=document.createElement("div");s.textContent=r.summary||"";var m=document.createElement("div");m.className="sub";m.textContent=date(r.reviewed_at)+(r.due_at?" · Due "+date(r.due_at):"");x.appendChild(b);x.appendChild(s);x.appendChild(m);list.appendChild(x)})}
 async function saveCompliance(){var b=document.getElementById("saveCompliance");b.disabled=true;status.textContent="Saving ownership and compliance contacts…";try{var payload={action:"update_compliance",organisation_name:document.getElementById("organisationName").value,owner_name:document.getElementById("ownerName").value,owner_email:document.getElementById("ownerEmail").value,owner_phone:document.getElementById("ownerPhone").value,compliance_contact_name:document.getElementById("complianceName").value,compliance_contact_email:document.getElementById("complianceEmail").value,technical_contact_name:document.getElementById("technicalName").value,technical_contact_email:document.getElementById("technicalEmail").value,privacy_contact_email:document.getElementById("privacyEmail").value,play_console_contact_email:document.getElementById("playEmail").value,route_all_notifications_to_owner:document.getElementById("routeAll").checked,notes:document.getElementById("complianceNotes").value};var d=await api(A,{method:"POST",body:JSON.stringify(payload)});renderCompliance({profile:d.profile,reviews:[]});status.textContent="Ownership and compliance contacts saved."}catch(e){status.textContent=e.message||"Could not save contacts."}finally{b.disabled=false}}
+// Public Android package IDs only; do not collect private installed-app lists
+// from employees. A manager can add a business app package ID separately.
+var fleetCustomAppsCatalog=[
+["WhatsApp","com.whatsapp"],["Telegram","org.telegram.messenger"],
+["Microsoft Teams","com.microsoft.teams"],["Slack","com.Slack"],
+["Google Messages","com.google.android.apps.messaging"],
+["Samsung Messages","com.samsung.android.messaging"],
+["Spotify","com.spotify.music"],["YouTube Music","com.google.android.apps.youtube.music"],
+["Google Maps","com.google.android.apps.maps"],["Waze","com.waze"],
+["Sygic","com.sygic.aura"],["TomTom GO","com.tomtom.gplay.navapp"],
+["TomTom GO Fleet","com.tomtom.gplay.navapp.gofleet"],
+["CoPilot","com.alk.copilot.mapviewer"],
+["Instagram","com.instagram.android"],["Facebook","com.facebook.katana"],
+["Messenger","com.facebook.orca"],["X / Twitter","com.twitter.android"],
+["TikTok","com.zhiliaoapp.musically"],["Snapchat","com.snapchat.android"],
+["Discord","com.discord"],["Reddit","com.reddit.frontpage"],
+["YouTube video","com.google.android.youtube"],
+["Netflix","com.netflix.mediaclient"],
+["Amazon Prime Video","com.amazon.avod.thirdpartyclient"],
+["Google Chrome","com.android.chrome"],["Samsung Internet","com.sec.android.app.sbrowser"],
+["Gmail","com.google.android.gm"],["Outlook","com.microsoft.office.outlook"],
+["Samsung Camera","com.sec.android.app.camera"],
+["Google Photos","com.google.android.apps.photos"]
+];
+var fleetCustomMandatory=new Set([
+"com.android.chrome","com.sec.android.app.sbrowser","org.mozilla.firefox",
+"com.microsoft.emmx","com.opera.browser","com.brave.browser",
+"com.instagram.android","com.facebook.katana","com.facebook.orca",
+"com.twitter.android","com.zhiliaoapp.musically","com.snapchat.android",
+"com.reddit.frontpage","com.instagram.barcelona","com.pinterest",
+"com.linkedin.android","com.google.android.youtube","com.netflix.mediaclient",
+"com.amazon.avod.thirdpartyclient","com.disney.disneyplus","tv.twitch.android.app",
+"com.google.android.gm","com.microsoft.office.outlook",
+"com.yahoo.mobile.client.android.mail","com.samsung.android.email.provider",
+"com.sec.android.app.camera","com.google.android.GoogleCamera",
+"com.android.camera2","com.sec.android.gallery3d",
+"com.google.android.apps.photos","com.jonathanpuckey.radiogarden"
+]);
+var fleetCustomRecommended=[
+"com.instagram.android","com.facebook.katana","com.facebook.orca",
+"com.twitter.android","com.zhiliaoapp.musically","com.snapchat.android",
+"com.google.android.youtube","com.reddit.frontpage","com.instagram.barcelona",
+"com.discord","com.netflix.mediaclient","com.amazon.avod.thirdpartyclient",
+"com.android.chrome","com.sec.android.app.sbrowser","com.google.android.gm",
+"com.microsoft.office.outlook"
+];
+var fleetCustomDraft=new Set(),fleetCustomCompanyId="";
+function renderCustomFleetApps(){
+ var area=document.getElementById("fleetCustomApps");area.textContent="";
+ var names=new Map(fleetCustomAppsCatalog);
+ var all=new Set([...names.keys()]);
+ var catalogPackages=new Set(fleetCustomAppsCatalog.map(x=>x[1]));
+ var entries=fleetCustomAppsCatalog.slice();
+ for(var pkg of fleetCustomDraft){
+   if(!catalogPackages.has(pkg))entries.push([pkg,pkg]);
+ }
+ entries.sort(function(a,b){return a[0].localeCompare(b[0])});
+ entries.forEach(function(entry){
+   var label=entry[0],pkg=entry[1],locked=fleetCustomMandatory.has(pkg);
+   var blocked=locked||fleetCustomDraft.has(pkg);
+   var wrap=document.createElement("div");wrap.className="fleet-custom-app";
+   var name=document.createElement("span");name.textContent=label;
+   var btn=document.createElement("button");btn.type="button";
+   btn.className=blocked?"blocked":"allowed";
+   btn.textContent=locked?"Blocked 🔒":blocked?"Blocked":"Allowed";
+   btn.title=pkg+(locked?" · mandatory driving-screen block":"");
+   btn.setAttribute("aria-label",label+" "+btn.textContent);
+   btn.disabled=locked;
+   btn.onclick=function(){
+     if(fleetCustomDraft.has(pkg))fleetCustomDraft.delete(pkg);
+     else fleetCustomDraft.add(pkg);
+     renderCustomFleetApps();
+   };
+   wrap.appendChild(name);wrap.appendChild(btn);area.appendChild(wrap);
+ });
+}
+function configureFleetCustom(d){
+ var current=d.fleet||null;
+ fleetCustomCompanyId=current&&current.id||"";
+ var configured=current&&current.custom_policy_updated_at;
+ fleetCustomDraft=new Set(configured && Array.isArray(current.custom_blocked_packages)
+   ?current.custom_blocked_packages:fleetCustomRecommended);
+ renderCustomFleetApps();
+ updateFleetCustomVisibility();
+}
+function updateFleetCustomVisibility(){
+ var selected=document.getElementById("fleetPreset").value;
+ var active=selected==="Custom";
+ document.getElementById("fleetCustomAppsArea").classList.toggle("hidden",!active);
+ if(active)document.getElementById("fleetCustomNotice").textContent=
+   "Tap an app to mark it Blocked (red) or Allowed (teal). Locked apps remain blocked by ROAD 1ST's driving-safety rules. Save to apply this company's Custom policy to enrolled phones.";
+}
+function addFleetCustomPackage(){
+ var field=document.getElementById("fleetCustomNewApp"),pkg=field.value.trim();
+ if(!/^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$/.test(pkg)||pkg.length>180){
+   status.textContent="Enter an Android app package ID, such as com.example.workapp.";return;
+ }
+ if(fleetCustomDraft.size>=250){status.textContent="Custom list limit reached.";return;}
+ fleetCustomDraft.add(pkg);field.value="";renderCustomFleetApps();
+ status.textContent="Work app added to the draft blocked list. Tap Allowed if you want it available while driving.";
+}
 function renderFleet(d){
   fleetData=d||{};
   var fleets=d.fleets||[],sel=document.getElementById("fleetSelect"),current=d.fleet||null;
@@ -1186,6 +1302,7 @@ function renderFleet(d){
   sel.textContent="";
   fleets.forEach(function(f){var o=document.createElement("option");o.value=f.id;o.textContent=f.name;if(current&&f.id===current.id)o.selected=true;sel.appendChild(o)});
   document.getElementById("fleetPreset").value=current&&current.blocking_preset?current.blocking_preset:"Recommended";
+  configureFleetCustom(d);
   document.getElementById("fleetWalkaroundRequired").value=current&&current.walkaround_required===true?"true":"false";
   var fuelList=document.getElementById("fleetFuelCardList");
   fuelList.textContent="";
@@ -1296,7 +1413,30 @@ function downloadDriverUpdateQr(){
 }
 async function loadFleet(fleetId){var url=F+(fleetId?"?fleet_id="+encodeURIComponent(fleetId):"");var d=await api(url);renderFleet(d);return d}
 async function createFleetEnrolment(){var name=document.getElementById("newDriverName").value.trim(),fleetId=document.getElementById("fleetSelect").value,b=document.getElementById("createEnrolment");if(!name){status.textContent="Enter the driver name.";return}b.disabled=true;status.textContent="Creating one-time enrolment QR…";try{var d=await api(F,{method:"POST",body:JSON.stringify({action:"create_enrolment",fleet_id:fleetId,driver_name:name})});var area=document.getElementById("qrArea"),svg=document.getElementById("qrSvg");if(typeof d.qr_svg!=="string"||d.qr_svg.indexOf("<svg")<0)throw Error("QR could not be generated.");svg.innerHTML=d.qr_svg;document.getElementById("qrMeta").textContent=(d.driver&&d.driver.display_name?d.driver.display_name:"Driver")+" · expires "+date(d.expires_at)+" · single use";area.classList.remove("hidden");document.getElementById("newDriverName").value="";status.textContent="QR ready. Scan it with the phone being enrolled.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not create enrolment."}finally{b.disabled=false}}
-async function saveFleetPolicy(){var fleetId=document.getElementById("fleetSelect").value,preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");b.disabled=true;try{await api(F,{method:"POST",body:JSON.stringify({action:"set_fleet_preset",fleet_id:fleetId,blocking_preset:preset})});status.textContent="Fleet policy saved. Enrolled phones pick it up automatically.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not save fleet policy."}finally{b.disabled=false}}
+async function saveFleetPolicy(){
+ var fleetId=document.getElementById("fleetSelect").value,
+     preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");
+ if(!fleetId||fleetId!==fleetCustomCompanyId){
+   status.textContent="Choose a fleet and reload its policy.";return;
+ }
+ b.disabled=true;
+ try{
+   if(preset==="Custom"){
+     var blocked=Array.from(fleetCustomDraft).sort();
+     if(blocked.length>250)throw Error("Custom app list is too long.");
+     await api(F,{method:"POST",body:JSON.stringify({
+       action:"set_fleet_custom_apps",fleet_id:fleetId,blocked_packages:blocked
+     })});
+   }else{
+     await api(F,{method:"POST",body:JSON.stringify({
+       action:"set_fleet_preset",fleet_id:fleetId,blocking_preset:preset
+     })});
+   }
+   status.textContent="Fleet policy saved. Enrolled phones pick up the change at their next secure status refresh.";
+   await loadFleet(fleetId);
+ }catch(e){status.textContent=e.message||"Could not save fleet policy."}
+ finally{b.disabled=false}
+}
 async function saveWalkaroundRequirement(){
   var fleetId=document.getElementById("fleetSelect").value,
       required=document.getElementById("fleetWalkaroundRequired").value==="true",
@@ -1743,6 +1883,8 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
   };
 })();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
+document.getElementById("fleetPreset").onchange=updateFleetCustomVisibility;
+document.getElementById("fleetCustomAdd").onclick=addFleetCustomPackage;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
 document.getElementById("fleetFuelCardProvider").onchange=fuelCardProviderSelectionChanged;
 document.getElementById("addFleetVehicle").onclick=addFleetVehicle;

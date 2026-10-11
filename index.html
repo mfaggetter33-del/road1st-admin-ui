@@ -1243,7 +1243,7 @@ function renderCustomFleetApps(){
    var name=document.createElement("span");name.textContent=label;
    var btn=document.createElement("button");btn.type="button";
    btn.className=blocked?"blocked":"allowed";
-   btn.textContent=locked?"Blocked 🔒":blocked?"Blocked":"Allowed";
+   btn.textContent=locked?reportT("Blocked")+" 🔒":blocked?reportT("Blocked"):reportT("Allowed");
    btn.title=pkg+(locked?" · mandatory driving-screen block":"");
    btn.setAttribute("aria-label",label+" "+btn.textContent);
    btn.disabled=locked;

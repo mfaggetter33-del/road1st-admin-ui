@@ -52,3 +52,15 @@ This document is a checkpoint, **not** a claim that the owner fleet inspection f
 5. Record evidence and obtain explicit owner approval before production migration, coordinated API/portal release or pilot behavior changes.
 
 **No production deploy or approval is implied by a code commit or draft PR.**
+
+
+## Isolated staging environment — 11 October 2026
+
+- Created a **separate** Supabase project **ROAD 1ST Owner Staging** in the existing Road 1st organisation (project ref `hrxyqmgpmkacteympdni`), at the quoted **0/month** project cost. Production project `ghyeurbeqwjfyzdwcepn` remains unchanged.
+- Applied a *synthetic-only* fleet schema, then the Custom-policy, optional-phone, and five owner-inspection/audit/enrolment migrations successfully in staging. No customer data was copied.
+- Deployed staged `road1st-fleet-admin-api` version 1 only to the isolated staging project; unauthenticated API GET was rejected with HTTP 401.
+- Deployed staged Owner/Fleet preview pages to staging as a static Edge Function. All embedded API addresses and publishable keys were replaced with staging equivalents; the preview source contains no production project reference. [HTTPS asset smoke run](https://github.com/mfaggetter33-del/road1st-admin-ui/actions/runs/38163634525) **passed on retry** following packaging repair.
+- A temporary staging test-runner endpoint was **disabled** (confirmed HTTP 410) after the integration could not invoke the authenticated test setup. Synthetic test credentials were not provisioned. The temporary pg_net testing extension was removed.
+- Read-only staging inventory confirmed 15 RLS-enabled staging tables, three owner RPC functions, **zero staged fleet records** and **zero test login accounts**.
+
+**Still pending:** genuine signed-in Owner/manager-A/manager-B access checks, scoped report/fuel/defect media links, browser workflow and phone tests. Existing GitHub disposable SQL checks and staging deployment/HTTPS checks **do not constitute full release security sign-off**. No merge or production migration/API/UI deployment has occurred.

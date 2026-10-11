@@ -1330,7 +1330,7 @@ function renderFleet(d){
     var line=document.createElement("div");line.className="device";
     var name=document.createElement("strong");name.textContent=card.label;
     var remove=document.createElement("button");remove.type="button";remove.className="secondary";
-    remove.textContent=reportT("Remove");
+    remove.textContent=reportT("Remove");remove.dataset.ownerAuditAction="archive_fuel_card";
     remove.setAttribute("aria-label",reportT("Remove fuel card")+": "+card.label);
     remove.onclick=function(){removeFleetFuelCard(card.id,card.label)};
     line.appendChild(name);line.appendChild(remove);fuelList.appendChild(line);
@@ -1364,7 +1364,7 @@ function renderFleet(d){
         version.appendChild(document.createTextNode(" · "));version.appendChild(badge);
       }
       var revoke=document.createElement("button");revoke.className="secondary";revoke.type="button";
-      revoke.textContent=reportT("Revoke");revoke.onclick=function(){revokeFleetDevice(x.id)};
+      revoke.textContent=reportT("Revoke");revoke.dataset.ownerAuditAction="revoke_device";revoke.onclick=function(){revokeFleetDevice(x.id)};
       action.appendChild(revoke);
     }
     row.appendChild(who);row.appendChild(dev);row.appendChild(version);row.appendChild(seen);
@@ -1495,7 +1495,7 @@ function renderFleetDriverAccounts(){
     var actions=document.createElement("div");
     if(canManage){
       var save=document.createElement("button");save.type="button";save.className="secondary";
-      save.textContent=reportT("Save phone");
+      save.textContent=reportT("Save phone");save.dataset.ownerAuditAction="update_driver_phone";
       save.onclick=async function(){
         save.disabled=true;
         try{
@@ -1511,7 +1511,7 @@ function renderFleetDriverAccounts(){
       };
       actions.appendChild(save);
       var replace=document.createElement("button");replace.type="button";replace.className="teal";
-      replace.textContent=reportT("Replace Phone");
+      replace.textContent=reportT("Replace Phone");replace.dataset.ownerAuditAction="replace_phone";
       replace.onclick=function(){replaceFleetDriverPhone(d)};
       actions.appendChild(replace);
     }
@@ -1623,10 +1623,10 @@ function renderFleetVehicles(){
     name.appendChild(label);name.appendChild(meta);
     var actions=document.createElement("div");actions.className="compliance-actions";
     var edit=document.createElement("button");edit.type="button";edit.className="secondary";
-    edit.textContent=reportT("Edit");
+    edit.textContent=reportT("Edit");edit.dataset.ownerAuditAction="edit_vehicle";
     edit.onclick=function(){editFleetVehicle(v)};
     var remove=document.createElement("button");remove.type="button";remove.className="secondary";
-    remove.textContent=reportT("Remove");
+    remove.textContent=reportT("Remove");remove.dataset.ownerAuditAction="remove_vehicle";
     remove.onclick=function(){removeFleetVehicle(v.id,v.registration)};
     actions.appendChild(edit);actions.appendChild(remove);
     row.appendChild(name);row.appendChild(actions);panel.appendChild(row);
@@ -1715,7 +1715,7 @@ async function removeFleetVehicle(id,registration){
     "The vehicle will be removed from this fleet register. Existing reports and receipts are kept.","Remove"))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
-      action:"remove_vehicle",fleet_id:fleetId,vehicle_id:id
+      action:"remove_vehicle",fleet_id:fleetId,vehicle_id:id,confirm_remove:true
     })});
     if(editingFleetVehicleId===id)resetVehicleEdit();
     await loadFleet(fleetId);
@@ -1881,7 +1881,7 @@ async function revokeFleetDevice(deviceId){
   if(!await confirmRoad1st("Revoke this phone from the fleet?","","","Revoke"))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
-      action:"revoke_device",fleet_id:fleetId,device_id:deviceId
+      action:"revoke_device",fleet_id:fleetId,device_id:deviceId,confirm_revoke:true
     })});
     status.textContent="Phone revoked.";
     await loadFleet(fleetId);
@@ -1930,15 +1930,16 @@ function updateOwnerInspectionUi(){
  var unsupported=["createEnrolment","newDriverName","newDriverPhone"];
  unsupported.forEach(function(id){var node=document.getElementById(id);if(node)node.disabled=true});
  // Dynamically rendered action buttons are also checked by the server.
+ var auditedActions=new Set(["edit_vehicle","remove_vehicle","archive_fuel_card","update_driver_phone","revoke_device"]);
  ["fleetVehicleList","fleetFuelCardList","fleetDriverList","deviceList"].forEach(function(id){
-  var node=document.getElementById(id);
-  if(!node)return;
+  var node=document.getElementById(id);if(!node)return;
   node.querySelectorAll("button").forEach(function(b){
-   if(!editable)b.disabled=true;
-   else if(id==="fleetDriverList"||id==="deviceList")b.disabled=true;
-   else if(/remove|delete/i.test(b.textContent||""))b.disabled=true;
-   else b.disabled=false;
+   var action=b.dataset.ownerAuditAction||"";
+   if(action)b.disabled=!editable||!auditedActions.has(action);
   });
+ });
+ document.querySelectorAll("#fleetDriverList input[type=tel]").forEach(function(input){
+  input.disabled=!editable;
  });
 }
 async function changeOwnerInspectionMode(mode){

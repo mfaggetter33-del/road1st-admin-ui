@@ -763,7 +763,7 @@ var ownerInspection=null,ownerInspectionRoute=new URLSearchParams(location.searc
 var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),recordsTable=document.getElementById("recordsTable"),compliancePanel=document.getElementById("compliancePanel"),fleetPanel=document.getElementById("fleetPanel"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
-function clear(){S=null;sessionStorage.removeItem("r1a")}
+function clear(){S=null;sessionStorage.removeItem("r1a");sessionStorage.removeItem("r1_owner_fleet_inspection")}
 async function refreshToken(){if(!S||!S.refresh_token)throw Error("Session expired.");var r=await fetch(P+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:K,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:S.refresh_token})});var d=await r.json();if(!r.ok)throw Error("Session expired.");save({access_token:d.access_token,refresh_token:d.refresh_token||S.refresh_token,expires_at:Date.now()+(d.expires_in||3600)*1000-30000})}
 async function api(url,opt){if(!S)throw Error("Not signed in.");
  if(ownerInspection&&url.indexOf(F)===0&&opt&&String(opt.method||"GET").toUpperCase()==="POST"){
@@ -1983,12 +1983,14 @@ document.getElementById("ownerInspectionBack").onclick=closeOwnerInspection;
 async function show(){
  if(ownerInspectionRoute){
   try{await bootstrapOwnerInspection()}catch(e){
-   clear();dash.classList.add("hidden");login.classList.remove("hidden");
-   err.textContent="Owner inspection could not be opened: "+(e.message||"Session expired")+". Return to the ROAD 1ST Owner page.";
+   // An expired owner support session should never sign the owner out.
+   // Return to the overview and preserve the authenticated owner session.
+   sessionStorage.removeItem("r1_owner_fleet_inspection");
+   location.replace("owner.html");
    return;
   }
  }
- if(new URLSearchParams(location.search).get("mode")==="fleet")C="fleet";login.classList.add("hidden");dash.classList.remove("hidden");try{await api(O,{method:"POST",body:JSON.stringify({action:"claim"})})}catch(e){}var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess||!!ownerInspection)});
+ if(new URLSearchParams(location.search).get("mode")==="fleet")C="fleet";login.classList.add("hidden");dash.classList.remove("hidden");if(!ownerInspection){try{await api(O,{method:"POST",body:JSON.stringify({action:"claim"})})}catch(e){}}var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess||!!ownerInspection)});
  if(ownerInspection){
   document.querySelectorAll(".stat").forEach(function(x){if(x.dataset.kind!=="fleet")x.classList.add("hidden")});
   C="fleet";

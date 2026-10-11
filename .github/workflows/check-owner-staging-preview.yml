@@ -1,0 +1,38 @@
+name: ROAD 1ST Owner Staging Preview HTTP Smoke
+on:
+  push:
+    branches:
+      - feature/owner-fleet-inspection-20261011
+    paths:
+      - .github/workflows/check-owner-staging-preview.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  staging-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check isolated preview pages and translation scripts over HTTPS
+        env:
+          STAGE_ROOT: https://hrxyqmgpmkacteympdni.supabase.co/functions/v1/road1st-owner-preview
+          STAGE_PUBLIC_KEY: sb_publishable_BWBUjiBbaKOy49gJ6Npnag_vrtTArg3
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/road1st-owner-stage
+          for file in owner.html index.html portal-i18n.js portal-owner-inspection-locales.js portal-translations.js road1st-logo.svg; do
+            echo "Checking staging asset: $file"
+            curl --fail --show-error --silent --retry 2 --max-time 20 \
+              -H "apikey: $STAGE_PUBLIC_KEY" \
+              "$STAGE_ROOT/$file" -o "/tmp/road1st-owner-stage/$file"
+            test -s "/tmp/road1st-owner-stage/$file"
+          done
+          grep -q "ROAD 1ST" /tmp/road1st-owner-stage/owner.html
+          grep -q "ROAD 1ST" /tmp/road1st-owner-stage/index.html
+          grep -q "hrxyqmgpmkacteympdni.supabase.co" /tmp/road1st-owner-stage/owner.html
+          grep -q "hrxyqmgpmkacteympdni.supabase.co" /tmp/road1st-owner-stage/index.html
+          if grep -q 'ghyeurbeqwjfyzdwcepn' /tmp/road1st-owner-stage/*.html; then
+            echo "ERROR: Staging HTML references the live ROAD 1ST project" >&2; exit 1
+          fi
+          echo "PASS: isolated staging Owner/Fleet static assets served without live API references."

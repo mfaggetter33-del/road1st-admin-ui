@@ -4,7 +4,7 @@
   "short_name": "ROAD 1ST Owner",
   "description": "Private ROAD 1ST business owner dashboard for fleet companies and applications",
   "start_url": "./owner.html",
-  "scope": "./",
+  "scope": "./owner.html",
   "display": "standalone",
   "background_color": "#0a0e14",
   "theme_color": "#0a0e14",

@@ -36,9 +36,19 @@ This document is a checkpoint, **not** a claim that the owner fleet inspection f
 - Backend work is staged separately in `mfaggetter33-del/driver-safety`, branch `feature/owner-fleet-control-audit-20261011`.
 - The backend authenticates the account, verifies the platform-owner role, binds the session to one fleet, expires it after 20 minutes, and records mode transitions atomically with audit entries.
 - The staged transactional owner mutation function covers policy selection (Recommended / Strict / Custom), walkaround requirement, vehicle add/edit/archive/remove, fuel-card add/archive, driver phone update and confirmed device revocation. Its mutation and audit entry occur in one database transaction. Read-Only and cross-fleet session writes are rejected.
-- **Not yet covered by transactional owner audit:** create enrolment QR, replace phone, and other driver/administrative actions. Those remain server-blocked for owner inspection rather than silently falling back to unlogged writes.
+- Owner creation of one-time driver enrolment QR and replacement-phone QR now also uses a separate transactional database function. The function binds owner/driver/fleet, records an audit entry, and revokes the prior device during replacement only if the invitation is successfully registered. The QR is rendered before the transaction and the raw secret is never stored in SQL. Phone replacement is explicitly confirmed. These changes are staged, not deployed or end-to-end verified.
 - The source HTML/JavaScript parses successfully and has no duplicate element IDs. SQL migration source has been inspected and repaired; it has **not** been applied or compiled by Postgres.
-- A staging-only authorization smoke script is saved as `tests/owner-fleet-staging-smoke.mjs` in the backend branch. The script explicitly refuses the live Supabase project. It **has not been run**.
+- A staging-only authorization smoke script is saved as `tests/owner-fleet-staging-smoke.mjs` in the backend branch. The script explicitly refuses the live Supabase project. It **has not been run**. A disposable PostgreSQL test fixture, SQL authorization assertions and CI workflow have also been staged; their successful execution is not yet evidenced.
 - The live database does not yet have the new owner audit/session tables, and custom fleet policy columns also need to be checked in the migration chain before integration testing.
 
 **Release state:** NOT READY. No live deployment, DB changes, cross-fleet authorization sign-off or end-to-end browser verification has been performed.
+
+## Owner release dependencies and order
+
+1. Verify staged Custom policy columns and optional driver phone migration on an isolated staging database; live columns are not yet present.
+2. Apply the five owner session/audit/enrolment migrations **to staging only** in ascending filename order, after those dependencies.
+3. Deploy the staged Fleet Admin API and portal HTML to an isolated staging instance only; never deploy either component alone.
+4. Run disposable PostgreSQL CI, end-to-end two-company negative tests (manager A cannot view/edit B), owner Read-Only mutation-denial tests, audited Full Control mutations, media URL scoping, phone replacement rollback and login/logout smoke tests.
+5. Record evidence and obtain explicit owner approval before production migration, coordinated API/portal release or pilot behavior changes.
+
+**No production deploy or approval is implied by a code commit or draft PR.**

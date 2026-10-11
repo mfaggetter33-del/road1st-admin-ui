@@ -1,0 +1,40 @@
+name: Check ROAD 1ST Admin Separation
+on:
+  push:
+    branches:
+      - fix/admin-separation-invitation-mail-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Admin and Owner UI separation and email invitation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          for path in ('index.html','owner.html'):
+              html=Path(path).read_text()
+              scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S|re.I)
+              assert scripts,path
+              for i,script in enumerate(scripts):
+                  out=Path('/tmp/'+path+'-'+str(i)+'.js')
+                  out.write_text(script)
+                  subprocess.run(['node','--check',str(out)],check=True)
+          owner=Path('owner.html').read_text()
+          fleet=Path('index.html').read_text()
+          assert 'ownerDashboardLink' not in fleet
+          assert 'Open Fleet Portal (testing)' not in owner
+          assert 'openCompanyFleet' not in owner
+          assert 'sendFleetInvitation(a)' in owner
+          assert 'road1st-fleet-invite-email' in owner
+          assert 'Email NOT sent' in owner
+          assert 'id="refresh"' in fleet
+          print('Page separation preserved, invitation email interface prepared')
+          PY

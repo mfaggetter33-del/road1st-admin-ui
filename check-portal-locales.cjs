@@ -49,9 +49,10 @@ for (const code of codes.filter(x => x !== "en")) {
 const html = fs.readFileSync("index.html", "utf8");
 for (const name of ["portalLanguage", "portal-translations.js", "portal-explanations.js", "portal-report-translations.js", "portal-messages.js", "portal-event-locales.js", "portal-generated-report-locales.js", "portal-timeline-locales.js", "portal-i18n.js"])
   assert.ok(html.includes(name), "missing portal integration " + name);
-for (const policy of ["Recommended", "Strict"])
+for (const policy of ["Strict", "Custom"])
   assert.ok(html.includes('<option value="' + policy + '">' + policy + '</option>'),
     "fleet policy values must remain untranslated: " + policy);
+assert.ok(!html.includes('<option value="Recommended">'), "no Recommended fleet choice");
 assert.ok(html.indexOf("portal-translations.js") < html.indexOf("portal-explanations.js"));
 assert.ok(html.indexOf("portal-explanations.js") < html.indexOf("portal-i18n.js"));
 assert.ok(html.includes('confirmRoad1st("Revoke this phone from the fleet?"'), "branded revocation uses translated confirmation");

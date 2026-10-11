@@ -753,6 +753,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <script src="portal-event-locales.js"></script>
 <script src="portal-generated-report-locales.js"></script>
 <script src="portal-timeline-locales.js"></script>
+<script src="portal-owner-inspection-locales.js"></script>
 <script src="portal-i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
@@ -1916,9 +1917,7 @@ function updateOwnerInspectionUi(){
  var name=fleetData&&fleetData.fleet&&fleetData.fleet.name||"Selected fleet";
  document.getElementById("ownerInspectionTitle").textContent="ROAD 1ST OWNER — Viewing: "+name;
  var editable=ownerInspection.mode==="full_control";
- document.getElementById("ownerInspectionDescription").textContent=editable
-  ?"Full Control active for this fleet only. Fleet settings, vehicles, drivers, one-time enrolment QR, phone replacement and fuel-card changes are audited."
-  :"Read-Only active — inspect fleet records, drivers, vehicles, fuel receipts and defects without changing them.";
+ document.getElementById("ownerInspectionDescription").textContent=editable?"Full Control":"Read-Only";
  document.getElementById("ownerInspectionFull").classList.toggle("hidden",editable);
  document.getElementById("ownerInspectionReadOnly").classList.toggle("hidden",!editable);
  document.getElementById("fleetSelect").disabled=true;

@@ -125,6 +125,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="ownerFleetInspection" class="hidden" aria-live="polite">
 <p id="ownerFleetInspectionStatus" class="notice">ROAD 1ST OWNER — Read-Only fleet inspection. No changes permitted in this view.</p>
 <div id="ownerFleetInspectionDetails" class="details"></div>
+<h3>Vehicles</h3><div id="ownerFleetInspectionVehicles" class="rows"></div>
 <h3>Drivers and enrolled devices</h3><div id="ownerFleetInspectionDrivers" class="rows"></div>
 <h3>Fleet records</h3><div class="row-actions"><label for="ownerFleetRecordCategory">Filter records</label><select id="ownerFleetRecordCategory"><option value="all">All records</option><option value="Journeys">Journeys</option><option value="Walkaround">Walkaround</option><option value="App blocking">App blocking</option><option value="Setup">Setup</option><option value="Ferry mode">Ferry mode</option><option value="Other">Other</option><option value="Fuel receipts">Fuel receipts</option><option value="Defect photos">Defect photos</option></select><button id="ownerFleetReloadRecords" type="button">Refresh records</button></div>
 <div id="ownerFleetInspectionRecords" class="rows"></div>
@@ -258,6 +259,7 @@ async function inspectCompany(f){
  el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+f.name+" — Read-Only · Loading…";
  el("ownerFleetInspectionDetails").textContent="";
  el("ownerFleetInspectionDrivers").textContent="";
+ el("ownerFleetInspectionVehicles").textContent="";
  el("ownerFleetInspectionRecords").textContent="";
  el("ownerFleetRecordCategory").value="all";
  try{
@@ -271,6 +273,9 @@ async function inspectCompany(f){
   putDetail(d,"Drivers",(detail.drivers||[]).length);
   putDetail(d,"Enrolled devices",(detail.devices||[]).length);
   putDetail(d,"Policy",fleet.blocking_preset||"Recommended");
+  var vehicles=el("ownerFleetInspectionVehicles");
+  (detail.vehicles||[]).forEach(function(vehicle){var row=document.createElement("div");row.className="company";var info=document.createElement("div");info.appendChild(txt("strong",vehicle.registration||"Unregistered vehicle"));rowMeta(info,(vehicle.vehicle_type||"Vehicle")+" · "+(vehicle.active?"Active":"Inactive"));row.appendChild(info);vehicles.appendChild(row)});
+  if(!(detail.vehicles||[]).length)vehicles.appendChild(txt("p","No vehicles registered.","empty"));
   var drivers=el("ownerFleetInspectionDrivers");
   (detail.drivers||[]).forEach(function(driver){
    var row=document.createElement("div");row.className="company";

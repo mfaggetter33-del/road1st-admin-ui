@@ -131,7 +131,8 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="ownerFleetInspectionRecords" class="rows"></div>
 <button id="closeFleetInspection" type="button">Close inspection</button>
 </div>
-<p class="sub" style="margin:14px 0 0">Full Control inspection requires audited server-side mode enforcement; it is not enabled in this development checkpoint.</p>
+<div class="row-actions"><span id="ownerFleetMode" class="pill">Mode: Read-Only</span><button id="ownerFleetEnableFull" type="button" class="purple">Request Full Control</button><button id="ownerFleetReturnReadOnly" type="button" class="hidden">Return to Read-Only</button></div>
+<p id="ownerFleetModeNotice" class="notice">Read-Only is the default. Full Control remains locked until the server audit and authorization checks are ready.</p>
 </div>
 <div class="panel">
 <div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
@@ -230,7 +231,8 @@ function renderCompanies(){
  if(!pilots.length)pilotArea.appendChild(txt("p","No internal testing fleets.","empty"));
  pilots.forEach(function(f){addFleetRow(pilotArea,f,true)});
 }
-var inspectionSequence=0, inspectionFleet=null;
+var inspectionSequence=0, inspectionFleet=null, inspectionMode="readonly";
+function resetInspectionMode(){inspectionMode="readonly";el("ownerFleetMode").textContent="Mode: Read-Only";el("ownerFleetEnableFull").classList.remove("hidden");el("ownerFleetReturnReadOnly").classList.add("hidden");el("ownerFleetModeNotice").textContent="Read-Only is active. No fleet changes are permitted in this inspection panel."}
 async function loadInspectionRecords(f,sequence){
  var category=el("ownerFleetRecordCategory").value;
  var url=F+"?kind=records&fleet_id="+encodeURIComponent(f.id)+"&category="+encodeURIComponent(category);
@@ -255,6 +257,7 @@ async function loadInspectionRecords(f,sequence){
 async function inspectCompany(f){
  var sequence=++inspectionSequence;
  inspectionFleet=f;
+ resetInspectionMode();
  el("ownerFleetInspection").classList.remove("hidden");
  el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+f.name+" — Read-Only · Loading…";
  el("ownerFleetInspectionDetails").textContent="";
@@ -603,6 +606,12 @@ el("refreshCompliance").onclick=function(){loadCompliance()};
 el("saveCompliance").onclick=saveCompliance;
 el("closeDetail").onclick=function(){++inspectionSequence;el("companyDetail").classList.add("hidden")};
 el("closeFleetInspection").onclick=function(){++inspectionSequence;el("ownerFleetInspection").classList.add("hidden")};
+el("ownerFleetEnableFull").onclick=async function(){
+ if(!inspectionFleet)return;
+ var answer=await ownerDialog({title:"Full Control — "+inspectionFleet.name,subject:"Owner support access",message:"Full Control can change fleet records. Every owner change must be audited. This feature remains locked until the server-side authorization and audit implementation is verified.",confirmLabel:"Acknowledge"});
+ if(answer.confirmed)el("ownerFleetModeNotice").textContent="Full Control not yet enabled: secure server enforcement and audit verification are required. Read-Only remains active.";
+};
+el("ownerFleetReturnReadOnly").onclick=resetInspectionMode;
 el("ownerFleetReloadRecords").onclick=function(){if(inspectionFleet)loadInspectionRecords(inspectionFleet,inspectionSequence).catch(function(e){el("ownerFleetInspectionStatus").textContent="Records unavailable: "+e.message})};
 el("ownerFleetRecordCategory").onchange=function(){el("ownerFleetReloadRecords").click()};
 el("logout").onclick=function(){S=null;sessionStorage.removeItem("r1a");location.reload()};

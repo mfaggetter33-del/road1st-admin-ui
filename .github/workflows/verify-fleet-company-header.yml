@@ -1,0 +1,47 @@
+name: Verify Fleet Company Header
+on:
+  push:
+    branches:
+      - fix/fleet-company-header-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript and owner/fleet banner behaviour
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          s=Path('index.html').read_text()
+          assert '<h1>ROAD 1ST</h1>' in s
+          assert '<h1>ROAD 1ST ADMIN</h1>' not in s
+          assert '<title>ROAD 1ST Fleet</title>' in s
+          assert 'id="currentFleetBrand"' in s
+          assert 'id="currentFleetName"' in s
+          assert 'current&&current.id&&typeof current.name==="string"' in s
+          assert 'headingName.textContent=companyName' in s
+          assert 'heading.classList.add("hidden")' in s
+          assert 'id="portalLanguage"' in s
+          assert 'id="refresh"' in s
+          assert 'id="fleetSelect"' in s
+          assert 'id="updateQrArea"' in s
+          scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          for i,src in enumerate(scripts):
+              p=Path('/tmp/fleet-inline-'+str(i)+'.js')
+              p.write_text(src)
+              subprocess.run(['node','--check',str(p)],check=True)
+          print('Authenticated fleet header, script syntax and existing controls verified')
+          PY
+      - name: Check unchanged portal language packs
+        run: |
+          node --check portal-translations.js
+          node --check portal-explanations.js
+          node --check portal-i18n.js
+          node check-portal-locales.cjs

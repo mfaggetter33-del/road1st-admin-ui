@@ -542,7 +542,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div class="sub">Register ROAD 1ST phones to a fleet with a 30-minute, single-use QR code. The QR does not contain an admin password or permanent company secret.</div>
 <div class="fleetgrid">
 <div><label>Fleet</label><select id="fleetSelect"></select></div>
-<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Recommended">Recommended</option><option value="Strict">Strict</option><option value="Custom">Custom</option></select></div>
+<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Strict">Strict</option><option value="Custom">Custom</option></select></div>
 </div>
 <div id="fleetCustomAppsArea" class="hidden">
   <div id="fleetCustomNotice" class="note"></div>
@@ -1203,20 +1203,6 @@ var fleetCustomAppsCatalog=[
 ["Samsung Camera","com.sec.android.app.camera"],
 ["Google Photos","com.google.android.apps.photos"]
 ];
-var fleetCustomMandatory=new Set([
-"com.android.chrome","com.sec.android.app.sbrowser","org.mozilla.firefox",
-"com.microsoft.emmx","com.opera.browser","com.brave.browser",
-"com.instagram.android","com.facebook.katana","com.facebook.orca",
-"com.twitter.android","com.zhiliaoapp.musically","com.snapchat.android",
-"com.reddit.frontpage","com.instagram.barcelona","com.pinterest",
-"com.linkedin.android","com.google.android.youtube","com.netflix.mediaclient",
-"com.amazon.avod.thirdpartyclient","com.disney.disneyplus","tv.twitch.android.app",
-"com.google.android.gm","com.microsoft.office.outlook",
-"com.yahoo.mobile.client.android.mail","com.samsung.android.email.provider",
-"com.sec.android.app.camera","com.google.android.GoogleCamera",
-"com.android.camera2","com.sec.android.gallery3d",
-"com.google.android.apps.photos","com.jonathanpuckey.radiogarden"
-]);
 var fleetCustomRecommended=[
 "com.instagram.android","com.facebook.katana","com.facebook.orca",
 "com.twitter.android","com.zhiliaoapp.musically","com.snapchat.android",
@@ -1228,8 +1214,6 @@ var fleetCustomRecommended=[
 var fleetCustomDraft=new Set(),fleetCustomCompanyId="";
 function renderCustomFleetApps(){
  var area=document.getElementById("fleetCustomApps");area.textContent="";
- var names=new Map(fleetCustomAppsCatalog);
- var all=new Set([...names.keys()]);
  var catalogPackages=new Set(fleetCustomAppsCatalog.map(x=>x[1]));
  var entries=fleetCustomAppsCatalog.slice();
  for(var pkg of fleetCustomDraft){
@@ -1237,16 +1221,15 @@ function renderCustomFleetApps(){
  }
  entries.sort(function(a,b){return a[0].localeCompare(b[0])});
  entries.forEach(function(entry){
-   var label=entry[0],pkg=entry[1],locked=fleetCustomMandatory.has(pkg);
-   var blocked=locked||fleetCustomDraft.has(pkg);
+   var label=entry[0],pkg=entry[1];
+   var blocked=fleetCustomDraft.has(pkg);
    var wrap=document.createElement("div");wrap.className="fleet-custom-app";
    var name=document.createElement("span");name.textContent=label;
    var btn=document.createElement("button");btn.type="button";
    btn.className=blocked?"blocked":"allowed";
-   btn.textContent=locked?reportT("Blocked")+" 🔒":blocked?reportT("Blocked"):reportT("Allowed");
-   btn.title=pkg+(locked?" · mandatory driving-screen block":"");
+   btn.textContent=blocked?reportT("Blocked"):reportT("Allowed");
+   btn.title=pkg;
    btn.setAttribute("aria-label",label+" "+btn.textContent);
-   btn.disabled=locked;
    btn.onclick=function(){
      if(fleetCustomDraft.has(pkg))fleetCustomDraft.delete(pkg);
      else fleetCustomDraft.add(pkg);
@@ -1269,11 +1252,11 @@ function updateFleetCustomVisibility(){
  var active=selected==="Custom";
  document.getElementById("fleetCustomAppsArea").classList.toggle("hidden",!active);
  if(active)document.getElementById("fleetCustomNotice").textContent=
-   "Tap an app to mark it Blocked (red) or Allowed (teal). Locked apps remain blocked by ROAD 1ST's driving-safety rules. Save to apply this company's Custom policy to enrolled phones.";
+   "Tap to choose Blocked (red) or Allowed (teal) for each app, including social, video and browser apps. Allowed apps may distract drivers; fleets must comply with road-safety rules. Emergency calls remain available. Save to apply this company's policy to enrolled phones.";
 }
 function addFleetCustomPackage(){
  var field=document.getElementById("fleetCustomNewApp"),pkg=field.value.trim();
- if(!/^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+$/.test(pkg)||pkg.length>180){
+ if(!/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/.test(pkg)||pkg.length>180){
    status.textContent="Enter an Android app package ID, such as com.example.workapp.";return;
  }
  if(fleetCustomDraft.size>=250){status.textContent="Custom list limit reached.";return;}
@@ -1301,7 +1284,7 @@ function renderFleet(d){
   }
   sel.textContent="";
   fleets.forEach(function(f){var o=document.createElement("option");o.value=f.id;o.textContent=f.name;if(current&&f.id===current.id)o.selected=true;sel.appendChild(o)});
-  document.getElementById("fleetPreset").value=current&&current.blocking_preset?current.blocking_preset:"Recommended";
+  document.getElementById("fleetPreset").value=current&&current.blocking_preset==="Custom"?"Custom":"Strict";
   configureFleetCustom(d);
   document.getElementById("fleetWalkaroundRequired").value=current&&current.walkaround_required===true?"true":"false";
   var fuelList=document.getElementById("fleetFuelCardList");
@@ -1416,6 +1399,9 @@ async function createFleetEnrolment(){var name=document.getElementById("newDrive
 async function saveFleetPolicy(){
  var fleetId=document.getElementById("fleetSelect").value,
      preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");
+ if(!["Strict","Custom"].includes(preset)){
+   status.textContent="Choose Strict or Custom.";return;
+ }
  if(!fleetId||fleetId!==fleetCustomCompanyId){
    status.textContent="Choose a fleet and reload its policy.";return;
  }

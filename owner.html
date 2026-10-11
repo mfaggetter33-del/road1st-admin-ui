@@ -100,6 +100,14 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div class="card"><b id="activeCount">—</b><span>Internal pilot fleets</span></div>
 <div class="card"><b id="pendingCount">—</b><span>Applications awaiting review</span></div>
 </div>
+<div class="panel" id="ownerReleases">
+<div class="panel-head"><div><h2>ROAD 1ST App Updates · Owner Control</h2><p class="sub">You approve one signed version for every fleet. Fleet managers have recovery QR/download access only.</p></div><button id="releaseRefresh" type="button">Refresh</button></div>
+<div class="company"><div><strong id="approvedVersion">Checking approved release…</strong><div id="approvedMeta" class="meta"></div></div><div class="row-actions"><button id="releaseCopy" disabled type="button">Copy link</button><button id="releaseShare" disabled type="button">Share approved APK</button></div></div>
+<details style="margin:12px 0 18px"><summary>Show approved QR</summary><div id="approvedQr" style="padding:12px;background:#fff;max-width:320px;border-radius:12px;margin:10px 0"></div></details>
+<h2>Publish an approved APK</h2><p class="sub">Published versions become available on the existing Fleet Portal Update QR immediately. Android still requires the driver to install an APK update.</p>
+<div class="details"><div><label for="releaseName">Exact version name</label><input id="releaseName" placeholder="2.99.7-pilot"></div><div><label for="releaseCode">Version code</label><input id="releaseCode" type="number" min="1" step="1" placeholder="106"></div></div>
+<label for="releaseFile">Signed APK</label><input id="releaseFile" type="file" accept=".apk,application/vnd.android.package-archive">
+<div class="row-actions" style="margin-top:12px"><button id="releasePublish" class="purple" type="button">Review and publish to all fleets</button></div><p id="releaseStatus" class="notice" role="status" aria-live="polite"></p></div>
 <div class="panel">
 <div class="panel-head"><div><h2>Customer companies</h2><p class="sub">Registered customer fleet accounts. A registered fleet is not necessarily a paying customer.</p></div><button type="button" id="refresh">Refresh</button></div>
 <div id="companies" class="rows" aria-live="polite"></div>
@@ -158,8 +166,8 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 (function(){"use strict";
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",
  K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",
- O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",
- S=null, fleets=[], applications=[];
+ O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",U=P+"/functions/v1/road1st-fleet-updates",
+ S=null, fleets=[], applications=[], approvedRelease=null;
 var el=function(id){return document.getElementById(id)};
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
@@ -401,6 +409,47 @@ async function saveCompliance(){
  }catch(e){el("complianceMeta").textContent="Could not save contacts: "+e.message}
  finally{b.disabled=false}
 }
+function releaseMessage(s){el("releaseStatus").textContent=s||""}
+async function loadRelease(){
+  var d=await api(U);
+  if(!d.can_publish)throw Error("Owner permission required.");
+  approvedRelease=d.latest||null;
+  el("approvedVersion").textContent=approvedRelease?"Approved: "+approvedRelease.version_name+" (code "+approvedRelease.version_code+")":"No approved release";
+  el("approvedMeta").textContent=approvedRelease?"Published "+new Date(approvedRelease.published_at).toLocaleString()+" · "+(approvedRelease.size_bytes/1048576).toFixed(2)+" MB · visible on all Fleet Portals":"Nothing has been published";
+  el("approvedQr").innerHTML=approvedRelease?approvedRelease.qr_svg:"";
+  el("releaseCopy").disabled=!approvedRelease;el("releaseShare").disabled=!approvedRelease;
+}
+async function releaseCopy(){
+  if(!approvedRelease)return;
+  try{await navigator.clipboard.writeText(approvedRelease.download_url);releaseMessage("Link copied.")}
+  catch(e){window.prompt("Copy approved link",approvedRelease.download_url)}
+}
+async function releaseShare(){
+  if(!approvedRelease)return;
+  try{if(navigator.share)await navigator.share({url:approvedRelease.download_url,title:"ROAD 1ST "+approvedRelease.version_name});else await releaseCopy()}
+  catch(e){if(e.name!=="AbortError")releaseMessage(e.message)}
+}
+async function publishRelease(){
+  var input=el("releaseFile"),file=input.files&&input.files[0],version=el("releaseName").value.trim(),code=Number(el("releaseCode").value),btn=el("releasePublish");
+  if(!file||!file.name.toLowerCase().endsWith(".apk"))return releaseMessage("Choose a signed APK.");
+  if(!/^[A-Za-z0-9._-]{3,48}$/.test(version))return releaseMessage("Enter the exact version name.");
+  if(!Number.isSafeInteger(code)||code<1||code>999999)return releaseMessage("Enter a valid Android version code.");
+  if(approvedRelease&&code<=approvedRelease.version_code)return releaseMessage("Use a version code higher than "+approvedRelease.version_code+".");
+  if(file.size<1024||file.size>25165824)return releaseMessage("APK must be smaller than 24 MB.");
+  var answer=await ownerDialog({title:"Publish ROAD 1ST to all fleets",subject:version+" (code "+code+")",message:"File: "+file.name+"\\n\\nPublishing will immediately change the Update QR used by all fleets. Only proceed if this signed APK has been tested. Installation is not automatic.",confirmLabel:"Publish to fleets"});
+  if(!answer.confirmed)return;
+  btn.disabled=true;releaseMessage("Uploading approved APK…");
+  try{
+    if(!S||!S.expires_at||Date.now()>=S.expires_at)await refreshToken();
+    var url=U+"?version="+encodeURIComponent(version)+"&code="+encodeURIComponent(code);
+    var req={method:"POST",headers:{apikey:K,Authorization:"Bearer "+S.access_token,"Content-Type":"application/vnd.android.package-archive"},body:file};
+    var response=await fetch(url,req);
+    if(response.status===401){await refreshToken();req.headers.Authorization="Bearer "+S.access_token;response=await fetch(url,req)}
+    var body={};try{body=await response.json()}catch(e){}
+    if(!response.ok)throw Error(body.error||"Upload failed");
+    input.value="";await loadRelease();releaseMessage("Approved version "+version+" is now available to all fleets.");
+  }catch(e){releaseMessage("Not published: "+(e.message||"Upload failed"))}finally{btn.disabled=false}
+}
 async function refresh(){
  status("Loading companies and applications…");
  try{
@@ -413,6 +462,7 @@ async function refresh(){
   var shown=el("companyDetail");if(!shown.classList.contains("hidden"))shown.classList.add("hidden");
   status("Owner records updated.");
   await loadCompliance();
+   try{await loadRelease()}catch(e){releaseMessage("Release status: "+e.message)}
  }catch(e){ownerVisible(false);el("loginError").textContent=e.message;status("");throw e}
 }
 async function signin(e){
@@ -428,6 +478,9 @@ async function signin(e){
 }
 el("loginForm").addEventListener("submit",signin);
 el("refresh").onclick=function(){refresh().catch(function(){})};
+ el("releaseRefresh").onclick=function(){loadRelease().catch(function(e){releaseMessage(e.message)})};
+ el("releaseCopy").onclick=releaseCopy;el("releaseShare").onclick=releaseShare;
+ el("releasePublish").onclick=publishRelease;
 el("refreshCompliance").onclick=function(){loadCompliance()};
 el("saveCompliance").onclick=saveCompliance;
 el("closeDetail").onclick=function(){el("companyDetail").classList.add("hidden")};

@@ -121,7 +121,14 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="detailFields" class="details"></div>
 <div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
 <p id="fleetStatusNote" class="notice"></p>
-<p class="sub" style="margin:14px 0 0">Open fleet data only when needed for testing or a customer support request.</p>
+<div class="row-actions"><button id="inspectFleet" type="button" class="teal">Inspect fleet records (Read-Only)</button></div>
+<div id="ownerFleetInspection" class="hidden" aria-live="polite">
+<p id="ownerFleetInspectionStatus" class="notice">ROAD 1ST OWNER — Read-Only fleet inspection. No changes permitted in this view.</p>
+<div id="ownerFleetInspectionDetails" class="details"></div>
+<h3>Fleet records</h3><div id="ownerFleetInspectionRecords" class="rows"></div>
+<button id="closeFleetInspection" type="button">Close inspection</button>
+</div>
+<p class="sub" style="margin:14px 0 0">Full Control inspection requires audited server-side mode enforcement; it is not enabled in this development checkpoint.</p>
 </div>
 <div class="panel">
 <div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
@@ -220,6 +227,35 @@ function renderCompanies(){
  if(!pilots.length)pilotArea.appendChild(txt("p","No internal testing fleets.","empty"));
  pilots.forEach(function(f){addFleetRow(pilotArea,f,true)});
 }
+var inspectionSequence=0;
+async function inspectCompany(f){
+ var sequence=++inspectionSequence, panel=el("ownerFleetInspection");
+ panel.classList.remove("hidden");
+ el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+f.name+" — Read-Only · Loading…";
+ el("ownerFleetInspectionDetails").textContent="";
+ el("ownerFleetInspectionRecords").textContent="";
+ try{
+  var detail=await api(F+"?fleet_id="+encodeURIComponent(f.id));
+  var records=await api(F+"?kind=records&fleet_id="+encodeURIComponent(f.id));
+  if(sequence!==inspectionSequence)return;
+  var d=el("ownerFleetInspectionDetails"), fleet=detail.fleet||{};
+  putDetail(d,"Fleet",fleet.name||f.name);
+  putDetail(d,"Status",fleet.status||f.status);
+  putDetail(d,"Drivers",(detail.drivers||[]).length);
+  putDetail(d,"Enrolled devices",(detail.devices||[]).length);
+  putDetail(d,"Policy",fleet.blocking_preset||"Recommended");
+  var area=el("ownerFleetInspectionRecords"), items=records.records||records.results||[];
+  if(!Array.isArray(items))throw Error("Unexpected records response");
+  if(!items.length)area.appendChild(txt("p","No records returned for this fleet.","empty"));
+  items.slice(0,100).forEach(function(item){
+   var row=document.createElement("div");row.className="company";
+   row.appendChild(txt("strong",item.category||item.kind||"Record"));
+   row.appendChild(txt("span"," · "+(item.registration||"No registration")+" · "+date(item.date),"meta"));
+   area.appendChild(row);
+  });
+  el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+(fleet.name||f.name)+" — Read-Only. Server-authorized fleet records; editing is not available in this inspection panel.";
+ }catch(e){if(sequence===inspectionSequence)el("ownerFleetInspectionStatus").textContent="Inspection unavailable: "+(e.message||"Request failed")}
+}
 function showCompany(f){
  var match=applications.find(function(a){return a.fleet_id===f.id&&a.status==="approved"});
  el("detailName").textContent=f.name;
@@ -238,6 +274,8 @@ function showCompany(f){
  toggle.textContent=f.status==="suspended"?"Reactivate fleet access":"Suspend fleet access";
  toggle.onclick=eligible?function(){changeFleetStatus(f,toggle)}:null;
  el("fleetStatusNote").textContent=isPilot(f)?"Internal pilot account — excluded from routine customer suspension.":f.status==="suspended"?"Fleet management suspended. Driver safety and previously uploaded records are preserved.":"Suspension affects management access only; it does not delete records or disable driver safety.";
+ el("ownerFleetInspection").classList.add("hidden");
+ el("inspectFleet").onclick=function(){inspectCompany(f)};
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
 }
@@ -528,7 +566,8 @@ el("refresh").onclick=function(){refresh().catch(function(){})};
  el("releasePublish").onclick=publishRelease;
 el("refreshCompliance").onclick=function(){loadCompliance()};
 el("saveCompliance").onclick=saveCompliance;
-el("closeDetail").onclick=function(){el("companyDetail").classList.add("hidden")};
+el("closeDetail").onclick=function(){++inspectionSequence;el("companyDetail").classList.add("hidden")};
+el("closeFleetInspection").onclick=function(){++inspectionSequence;el("ownerFleetInspection").classList.add("hidden")};
 el("logout").onclick=function(){S=null;sessionStorage.removeItem("r1a");location.reload()};
 if(S)refresh().catch(function(){});
 })();

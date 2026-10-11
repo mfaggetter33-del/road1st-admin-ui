@@ -125,7 +125,9 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="ownerFleetInspection" class="hidden" aria-live="polite">
 <p id="ownerFleetInspectionStatus" class="notice">ROAD 1ST OWNER — Read-Only fleet inspection. No changes permitted in this view.</p>
 <div id="ownerFleetInspectionDetails" class="details"></div>
-<h3>Fleet records</h3><div id="ownerFleetInspectionRecords" class="rows"></div>
+<h3>Drivers and enrolled devices</h3><div id="ownerFleetInspectionDrivers" class="rows"></div>
+<h3>Fleet records</h3><div class="row-actions"><label for="ownerFleetRecordCategory">Filter records</label><select id="ownerFleetRecordCategory"><option value="all">All records</option><option value="Journeys">Journeys</option><option value="Walkaround">Walkaround</option><option value="App blocking">App blocking</option><option value="Setup">Setup</option><option value="Ferry mode">Ferry mode</option><option value="Other">Other</option><option value="Fuel receipts">Fuel receipts</option><option value="Defect photos">Defect photos</option></select><button id="ownerFleetReloadRecords" type="button">Refresh records</button></div>
+<div id="ownerFleetInspectionRecords" class="rows"></div>
 <button id="closeFleetInspection" type="button">Close inspection</button>
 </div>
 <p class="sub" style="margin:14px 0 0">Full Control inspection requires audited server-side mode enforcement; it is not enabled in this development checkpoint.</p>
@@ -227,33 +229,61 @@ function renderCompanies(){
  if(!pilots.length)pilotArea.appendChild(txt("p","No internal testing fleets.","empty"));
  pilots.forEach(function(f){addFleetRow(pilotArea,f,true)});
 }
-var inspectionSequence=0;
+var inspectionSequence=0, inspectionFleet=null;
+async function loadInspectionRecords(f,sequence){
+ var category=el("ownerFleetRecordCategory").value;
+ var url=F+"?kind=records&fleet_id="+encodeURIComponent(f.id)+"&category="+encodeURIComponent(category);
+ var response=await api(url);
+ if(sequence!==inspectionSequence)return;
+ if(response.fleet_id!==f.id)throw Error("Fleet record response did not match selected fleet");
+ var area=el("ownerFleetInspectionRecords"),items=response.records;
+ area.textContent="";
+ if(!Array.isArray(items))throw Error("Unexpected records response");
+ if(!items.length)area.appendChild(txt("p","No matching records for this fleet.","empty"));
+ items.slice(0,100).forEach(function(item){
+  var row=document.createElement("div");row.className="company";
+  var info=document.createElement("div");
+  info.appendChild(txt("strong",item.category||item.kind||"Record"));
+  rowMeta(info,(item.registration||"No registration")+" · "+date(item.date));
+  if(item.description)rowMeta(info,item.description);
+  row.appendChild(info);
+  area.appendChild(row);
+ });
+ if(response.limited||items.length>100)area.appendChild(txt("p","Showing a limited number of records. Narrow the category for more results.","notice"));
+}
 async function inspectCompany(f){
- var sequence=++inspectionSequence, panel=el("ownerFleetInspection");
- panel.classList.remove("hidden");
+ var sequence=++inspectionSequence;
+ inspectionFleet=f;
+ el("ownerFleetInspection").classList.remove("hidden");
  el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+f.name+" — Read-Only · Loading…";
  el("ownerFleetInspectionDetails").textContent="";
+ el("ownerFleetInspectionDrivers").textContent="";
  el("ownerFleetInspectionRecords").textContent="";
+ el("ownerFleetRecordCategory").value="all";
  try{
   var detail=await api(F+"?fleet_id="+encodeURIComponent(f.id));
-  var records=await api(F+"?kind=records&fleet_id="+encodeURIComponent(f.id));
   if(sequence!==inspectionSequence)return;
-  var d=el("ownerFleetInspectionDetails"), fleet=detail.fleet||{};
+  var fleet=detail.fleet||{};
+  if(fleet.id!==f.id)throw Error("Fleet detail response did not match selected fleet");
+  var d=el("ownerFleetInspectionDetails");
   putDetail(d,"Fleet",fleet.name||f.name);
   putDetail(d,"Status",fleet.status||f.status);
   putDetail(d,"Drivers",(detail.drivers||[]).length);
   putDetail(d,"Enrolled devices",(detail.devices||[]).length);
   putDetail(d,"Policy",fleet.blocking_preset||"Recommended");
-  var area=el("ownerFleetInspectionRecords"), items=records.records||records.results||[];
-  if(!Array.isArray(items))throw Error("Unexpected records response");
-  if(!items.length)area.appendChild(txt("p","No records returned for this fleet.","empty"));
-  items.slice(0,100).forEach(function(item){
+  var drivers=el("ownerFleetInspectionDrivers");
+  (detail.drivers||[]).forEach(function(driver){
    var row=document.createElement("div");row.className="company";
-   row.appendChild(txt("strong",item.category||item.kind||"Record"));
-   row.appendChild(txt("span"," · "+(item.registration||"No registration")+" · "+date(item.date),"meta"));
-   area.appendChild(row);
+   var info=document.createElement("div");
+   info.appendChild(txt("strong",driver.display_name||"Unnamed driver"));
+   rowMeta(info,driver.active===true?"Active driver":"Inactive driver");
+   var deviceCount=(detail.devices||[]).filter(function(device){return device.driver_id===driver.id&&device.revoked_at==null}).length;
+   rowMeta(info,"Active devices: "+deviceCount);
+   row.appendChild(info);drivers.appendChild(row);
   });
-  el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+(fleet.name||f.name)+" — Read-Only. Server-authorized fleet records; editing is not available in this inspection panel.";
+  if(!(detail.drivers||[]).length)drivers.appendChild(txt("p","No drivers enrolled.","empty"));
+  await loadInspectionRecords(f,sequence);
+  if(sequence===inspectionSequence)el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+(fleet.name||f.name)+" — Read-Only. This inspection panel does not allow changes.";
  }catch(e){if(sequence===inspectionSequence)el("ownerFleetInspectionStatus").textContent="Inspection unavailable: "+(e.message||"Request failed")}
 }
 function showCompany(f){
@@ -568,6 +598,8 @@ el("refreshCompliance").onclick=function(){loadCompliance()};
 el("saveCompliance").onclick=saveCompliance;
 el("closeDetail").onclick=function(){++inspectionSequence;el("companyDetail").classList.add("hidden")};
 el("closeFleetInspection").onclick=function(){++inspectionSequence;el("ownerFleetInspection").classList.add("hidden")};
+el("ownerFleetReloadRecords").onclick=function(){if(inspectionFleet)loadInspectionRecords(inspectionFleet,inspectionSequence).catch(function(e){el("ownerFleetInspectionStatus").textContent="Records unavailable: "+e.message})};
+el("ownerFleetRecordCategory").onchange=function(){el("ownerFleetReloadRecords").click()};
 el("logout").onclick=function(){S=null;sessionStorage.removeItem("r1a");location.reload()};
 if(S)refresh().catch(function(){});
 })();

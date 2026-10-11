@@ -1,0 +1,37 @@
+name: Check ROAD 1ST Invite Handoff
+on:
+  push:
+    branches:
+      - feature/remote-fleet-invitations-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check script syntax and avoid third-party token leaks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          for name in ('index.html','enrol.html'):
+              html=Path(name).read_text()
+              scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S|re.I)
+              assert scripts, f'Missing scripts in {name}'
+              for i,script in enumerate(scripts):
+                  out=Path('/tmp/'+name+'-'+str(i)+'.js')
+                  out.write_text(script)
+                  subprocess.run(['node','--check',str(out)],check=True)
+          handoff=Path('enrol.html').read_text()
+          assert 'no-referrer' in handoff and 'history.replaceState' in handoff
+          assert 'road1st://enrol?token=' in handoff
+          portal=Path('index.html').read_text()
+          for action in ('copyFleetInvite','shareFleetInvite','remoteInvitationLink'):
+              assert action in portal
+          print('JavaScript and invitation privacy checks passed')
+          PY

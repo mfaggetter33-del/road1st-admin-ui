@@ -81,7 +81,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <body>
 <header><div class="wrap head">
 <div class="brand"><img src="road1st-logo.svg" alt="ROAD 1ST logo"><div><strong>ROAD 1ST</strong><small>Owner Dashboard · Business management</small></div></div>
-<div class="actions"><a class="button" href="./?mode=fleet">Open Fleet Portal (testing)</a><button id="logout" class="hidden" type="button">Sign out</button></div>
+<div class="actions"><button id="logout" class="hidden" type="button">Sign out</button></div>
 </div></header>
 <main class="wrap">
 <section class="panel login" id="login">
@@ -100,6 +100,14 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div class="card"><b id="activeCount">—</b><span>Internal pilot fleets</span></div>
 <div class="card"><b id="pendingCount">—</b><span>Applications awaiting review</span></div>
 </div>
+<div class="panel" id="ownerReleases">
+<div class="panel-head"><div><h2>ROAD 1ST App Updates · Owner Control</h2><p class="sub">You approve one signed version for every fleet. Fleet managers have recovery QR/download access only.</p></div><button id="releaseRefresh" type="button">Refresh</button></div>
+<div class="company"><div><strong id="approvedVersion">Checking approved release…</strong><div id="approvedMeta" class="meta"></div></div><div class="row-actions"><button id="releaseCopy" disabled type="button">Copy link</button><button id="releaseShare" disabled type="button">Share approved APK</button></div></div>
+<details style="margin:12px 0 18px"><summary>Show approved QR</summary><div id="approvedQr" style="padding:12px;background:#fff;max-width:320px;border-radius:12px;margin:10px 0"></div></details>
+<h2>Publish an approved APK</h2><p class="sub">Published versions become available on the existing Fleet Portal Update QR immediately. Android still requires the driver to install an APK update.</p>
+<div class="details"><div><label for="releaseName">Exact version name</label><input id="releaseName" placeholder="2.99.7-pilot"></div><div><label for="releaseCode">Version code</label><input id="releaseCode" type="number" min="1" step="1" placeholder="106"></div></div>
+<label for="releaseFile">Signed APK</label><input id="releaseFile" type="file" accept=".apk,application/vnd.android.package-archive">
+<div class="row-actions" style="margin-top:12px"><button id="releasePublish" class="purple" type="button">Review and publish to all fleets</button></div><p id="releaseStatus" class="notice" role="status" aria-live="polite"></p></div>
 <div class="panel">
 <div class="panel-head"><div><h2>Customer companies</h2><p class="sub">Registered customer fleet accounts. A registered fleet is not necessarily a paying customer.</p></div><button type="button" id="refresh">Refresh</button></div>
 <div id="companies" class="rows" aria-live="polite"></div>
@@ -111,13 +119,13 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="companyDetail" class="panel hidden">
 <div class="panel-head"><h2 id="detailName">Company</h2><button id="closeDetail" type="button">Close</button></div>
 <div id="detailFields" class="details"></div>
-<div class="row-actions"><a id="openCompanyFleet" class="button teal" href="./?mode=fleet">Open this company in Fleet Portal</a><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
+<div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
 <p id="fleetStatusNote" class="notice"></p>
 <p class="sub" style="margin:14px 0 0">Open fleet data only when needed for testing or a customer support request.</p>
 </div>
 <div class="panel">
-<div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an invitation.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
-<div id="applications" class="rows" aria-live="polite"></div>
+<div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
+<p id="ownerEmailReadiness" class="notice" role="status">Checking ROAD 1ST email configuration…</p><div id="applications" class="rows" aria-live="polite"></div>
 </div>
 <section class="panel" id="ownershipCompliance">
 <div class="panel-head"><div><h2>Ownership &amp; compliance</h2><p class="sub">Business ownership, contacts and review history. Owner-only information; not part of any fleet account.</p></div><button id="refreshCompliance" type="button">Refresh compliance</button></div>
@@ -158,8 +166,8 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 (function(){"use strict";
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",
  K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",
- O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",
- S=null, fleets=[], applications=[];
+ O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",U=P+"/functions/v1/road1st-fleet-updates",E=P+"/functions/v1/road1st-fleet-invite-email",
+ S=null, fleets=[], applications=[], approvedRelease=null, emailConfigured=false, emailAttempts={};
 var el=function(id){return document.getElementById(id)};
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
@@ -224,7 +232,7 @@ function showCompany(f){
  putDetail(area,"Contact email",match?match.contact_email:"Not recorded in application");
  putDetail(area,"Expected vehicles",match&&match.expected_vehicles?match.expected_vehicles:"Not supplied");
  putDetail(area,"Fleet ID",f.id);
- el("openCompanyFleet").href="./?mode=fleet&fleet_id="+encodeURIComponent(f.id);
+ 
  var toggle=el("toggleFleetStatus"),eligible=!isPilot(f)&&["active","suspended"].includes(f.status);
  toggle.className=(f.status==="suspended"?"teal":"purple")+(eligible?"":" hidden");
  toggle.textContent=f.status==="suspended"?"Reactivate fleet access":"Suspend fleet access";
@@ -232,6 +240,40 @@ function showCompany(f){
  el("fleetStatusNote").textContent=isPilot(f)?"Internal pilot account — excluded from routine customer suspension.":f.status==="suspended"?"Fleet management suspended. Driver safety and previously uploaded records are preserved.":"Suspension affects management access only; it does not delete records or disable driver safety.";
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function loadEmailReadiness(){
+ var data=await api(E+"?kind=status");
+ emailConfigured=data.credentials_configured===true;
+ emailAttempts=data.latest_attempts||{};
+ el("ownerEmailReadiness").textContent=emailConfigured
+  ?"Sending credentials detected. Verify r1st.ie and test delivery before sending customer invitations."
+  :"Email sending not yet configured. No automatic approval invitations have been sent.";
+ renderApplications();
+}
+async function sendFleetInvitation(application){
+ if(application.status!=="approved"||!application.fleet_id)return status("Approve the company first.");
+ var confirmation=await ownerDialog({
+  title:"Send ROAD 1ST Fleet invitation",
+  subject:application.company_name,
+  message:"Send an approval email from ROAD 1ST to:\n"+application.contact_email+
+   "\n\nThe customer will receive a Fleet Portal registration link. Sending requires the ROAD 1ST email service to be configured.",
+  confirmLabel:"Send invitation"
+ });
+ if(!confirmation.confirmed)return;
+ status("Requesting ROAD 1ST invitation email…");
+ try{
+  var result=await api(E,{method:"POST",body:JSON.stringify({
+   action:"send_approved_invitation",application_id:application.id
+  })});
+  if(result.status!=="accepted_for_delivery")throw Error("Email not accepted by sending provider.");
+  status("Sending provider accepted the email to "+result.recipient+". Inbox delivery is not yet confirmed.");
+  await loadEmailReadiness();
+ }catch(e){
+  var error=e.message||"Unknown error";
+  if(error==="email_delivery_not_configured")error="Outgoing ROAD 1ST email is not configured yet. Nothing was sent.";
+  if(error==="email_recently_requested")error="A recent invitation request is already recorded. Try later.";
+  status("Email NOT sent: "+error);
+ }
 }
 function copyInvitation(a){
  var message="ROAD 1ST Fleet - Account approved\n\nHello "+a.contact_name+",\n\nYour company, "+a.company_name+", is approved for ROAD 1ST Fleet.\n\nOpen https://mfaggetter33-del.github.io/road1st-admin-ui/\nSelect First time? Create account and use this exact email: "+a.contact_email+"\nChoose a password, verify your email, and sign in.\n\nNo payment has been set up.\n\nROAD 1ST";
@@ -360,6 +402,16 @@ function renderApplications(){
   var edit=button(a.decline_reason?"Edit reason":"Add reason",function(){ownerDecision(a,"save_decline_reason",edit)});
   actions.appendChild(reconsider);actions.appendChild(edit);
  }else if(a.status==="approved"){
+  var last=emailAttempts[a.id];
+  rowMeta(info,"Email invitation: "+(!last?"Not yet requested":
+   last.state==="provider_accepted"?"Accepted by provider "+date(last.at)+" (inbox not confirmed)":
+   last.state==="queued"?"Sending request queued":
+   last.state==="rejected"?"Provider rejected the message":
+   "Result uncertain — check before retrying"));
+  var send=button("Send invitation email",function(){sendFleetInvitation(a)},"teal");
+  send.disabled=!emailConfigured;
+  send.title=emailConfigured?"Send through ROAD 1ST email service":"Email service not yet configured";
+  actions.appendChild(send);
   actions.appendChild(button("Copy invitation",function(){copyInvitation(a)}));
  }
  var clear=button("Clear",function(){ownerDecision(a,"clear",clear)});
@@ -401,6 +453,47 @@ async function saveCompliance(){
  }catch(e){el("complianceMeta").textContent="Could not save contacts: "+e.message}
  finally{b.disabled=false}
 }
+function releaseMessage(s){el("releaseStatus").textContent=s||""}
+async function loadRelease(){
+  var d=await api(U);
+  if(!d.can_publish)throw Error("Owner permission required.");
+  approvedRelease=d.latest||null;
+  el("approvedVersion").textContent=approvedRelease?"Approved: "+approvedRelease.version_name+" (code "+approvedRelease.version_code+")":"No approved release";
+  el("approvedMeta").textContent=approvedRelease?"Published "+new Date(approvedRelease.published_at).toLocaleString()+" · "+(approvedRelease.size_bytes/1048576).toFixed(2)+" MB · visible on all Fleet Portals":"Nothing has been published";
+  el("approvedQr").innerHTML=approvedRelease?approvedRelease.qr_svg:"";
+  el("releaseCopy").disabled=!approvedRelease;el("releaseShare").disabled=!approvedRelease;
+}
+async function releaseCopy(){
+  if(!approvedRelease)return;
+  try{await navigator.clipboard.writeText(approvedRelease.download_url);releaseMessage("Link copied.")}
+  catch(e){window.prompt("Copy approved link",approvedRelease.download_url)}
+}
+async function releaseShare(){
+  if(!approvedRelease)return;
+  try{if(navigator.share)await navigator.share({url:approvedRelease.download_url,title:"ROAD 1ST "+approvedRelease.version_name});else await releaseCopy()}
+  catch(e){if(e.name!=="AbortError")releaseMessage(e.message)}
+}
+async function publishRelease(){
+  var input=el("releaseFile"),file=input.files&&input.files[0],version=el("releaseName").value.trim(),code=Number(el("releaseCode").value),btn=el("releasePublish");
+  if(!file||!file.name.toLowerCase().endsWith(".apk"))return releaseMessage("Choose a signed APK.");
+  if(!/^[A-Za-z0-9._-]{3,48}$/.test(version))return releaseMessage("Enter the exact version name.");
+  if(!Number.isSafeInteger(code)||code<1||code>999999)return releaseMessage("Enter a valid Android version code.");
+  if(approvedRelease&&code<=approvedRelease.version_code)return releaseMessage("Use a version code higher than "+approvedRelease.version_code+".");
+  if(file.size<1024||file.size>25165824)return releaseMessage("APK must be smaller than 24 MB.");
+  var answer=await ownerDialog({title:"Publish ROAD 1ST to all fleets",subject:version+" (code "+code+")",message:"File: "+file.name+"\\n\\nPublishing will immediately change the Update QR used by all fleets. Only proceed if this signed APK has been tested. Installation is not automatic.",confirmLabel:"Publish to fleets"});
+  if(!answer.confirmed)return;
+  btn.disabled=true;releaseMessage("Uploading approved APK…");
+  try{
+    if(!S||!S.expires_at||Date.now()>=S.expires_at)await refreshToken();
+    var url=U+"?version="+encodeURIComponent(version)+"&code="+encodeURIComponent(code);
+    var req={method:"POST",headers:{apikey:K,Authorization:"Bearer "+S.access_token,"Content-Type":"application/vnd.android.package-archive"},body:file};
+    var response=await fetch(url,req);
+    if(response.status===401){await refreshToken();req.headers.Authorization="Bearer "+S.access_token;response=await fetch(url,req)}
+    var body={};try{body=await response.json()}catch(e){}
+    if(!response.ok)throw Error(body.error||"Upload failed");
+    input.value="";await loadRelease();releaseMessage("Approved version "+version+" is now available to all fleets.");
+  }catch(e){releaseMessage("Not published: "+(e.message||"Upload failed"))}finally{btn.disabled=false}
+}
 async function refresh(){
  status("Loading companies and applications…");
  try{
@@ -413,6 +506,8 @@ async function refresh(){
   var shown=el("companyDetail");if(!shown.classList.contains("hidden"))shown.classList.add("hidden");
   status("Owner records updated.");
   await loadCompliance();
+   try{await loadRelease()}catch(e){releaseMessage("Release status: "+e.message)}
+   try{await loadEmailReadiness()}catch(e){el("ownerEmailReadiness").textContent="Email status unavailable: "+e.message}
  }catch(e){ownerVisible(false);el("loginError").textContent=e.message;status("");throw e}
 }
 async function signin(e){
@@ -428,6 +523,9 @@ async function signin(e){
 }
 el("loginForm").addEventListener("submit",signin);
 el("refresh").onclick=function(){refresh().catch(function(){})};
+ el("releaseRefresh").onclick=function(){loadRelease().catch(function(e){releaseMessage(e.message)})};
+ el("releaseCopy").onclick=releaseCopy;el("releaseShare").onclick=releaseShare;
+ el("releasePublish").onclick=publishRelease;
 el("refreshCompliance").onclick=function(){loadCompliance()};
 el("saveCompliance").onclick=saveCompliance;
 el("closeDetail").onclick=function(){el("companyDetail").classList.add("hidden")};

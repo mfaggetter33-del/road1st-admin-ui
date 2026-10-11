@@ -1,0 +1,45 @@
+name: Verify Owner Release and Invitation Controls
+on:
+  push:
+    branches:
+      - feature/owner-release-and-mail-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify scripts and separated page permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          owner=Path('owner.html').read_text()
+          fleet=Path('index.html').read_text()
+          for path,html in (('owner.html',owner),('index.html',fleet)):
+              scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S|re.I)
+              assert scripts, 'Missing JS '+path
+              for i,s in enumerate(scripts):
+                  script=Path('/tmp/'+path+str(i)+'.js')
+                  script.write_text(s)
+                  subprocess.run(['node','--check',str(script)],check=True)
+          for marker in ('id="releasePublish"','id="releaseFile"','id="approvedQr"',
+                         'async function publishRelease()', 'road1st-fleet-invite-email',
+                         'sendFleetInvitation(application)', 'Copy invitation'):
+              assert marker in owner, 'Missing Owner control '+marker
+          assert 'Open Fleet Portal (testing)' not in owner
+          assert 'openCompanyFleet' not in owner
+          assert 'ownerDashboardLink' not in fleet
+          assert 'publishPilotApk' not in fleet
+          assert 'id="updateQrArea"' in fleet
+          assert 'id="refresh"' in fleet
+          assert 'latestPilotRelease.download_url' in fleet
+          assert 'latestPilotRelease.qr_svg' in fleet
+          print('Owner-only publishing and invitation; Fleet manual recovery preserved.')
+          PY

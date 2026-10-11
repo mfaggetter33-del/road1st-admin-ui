@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/fleet-custom-policy-20261011
+      - feature/secure-driver-replacement-20261011
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,6 +32,14 @@ jobs:
           assert 'id="fleetCustomApps"' in html
           assert 'fleetCustomMandatory' not in html
           assert 'id="updateQrArea"' in html
+          assert 'id="fleetDriverList"' in html
+          assert 'id="fleetDriverFind"' in html
+          assert 'id="newDriverPhone"' in html
+          assert 'action:"replace_phone"' in html
+          assert 'action:"update_driver_phone"' in html
+          assert 'replaceFleetDriverPhone(driver)' in html
+          assert 'driver_id:driver.id' in html
+          assert 'action:"create_enrolment",fleet_id:fleetId,driver_name:name,phone_number:phone' in html
           print("Custom policy UI and syntax checked.")
           PY
       - name: Verify 32 language packs

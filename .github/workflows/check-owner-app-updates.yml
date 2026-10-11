@@ -1,0 +1,41 @@
+name: Check Owner-Controlled ROAD 1ST Updates
+on:
+  push:
+    branches:
+      - feature/owner-controlled-app-updates-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate owner and fleet JavaScript, control separation, and QR recovery
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          owner=Path("owner.html").read_text()
+          fleet=Path("index.html").read_text()
+          for file,doc in (("owner.html",owner),("index.html",fleet)):
+              scripts=re.findall(r'<script(?:\\s[^>]*)?>(.*?)</script>',doc,re.S|re.I)
+              assert scripts, file+" has no inline script"
+              for i,code in enumerate(scripts):
+                  tmp=Path("/tmp/"+file+"-"+str(i)+".js")
+                  tmp.write_text(code)
+                  subprocess.run(["node","--check",str(tmp)],check=True)
+          assert 'id="releasePublish"' in owner
+          assert 'ownerDialog' in owner and 'publishRelease' in owner
+          assert 'road1st-fleet-updates' in owner
+          assert 'id="pilotPublishArea"' not in fleet
+          assert 'publishPilotApk' not in fleet
+          assert 'id="updateQrArea"' in fleet
+          assert 'latestPilotRelease.qr_svg' in fleet
+          assert 'latestPilotRelease.download_url' in fleet
+          assert 'refreshLatestPilot' in fleet
+          print("Owner-only publish interface; fleet recovery QR retained.")
+          PY

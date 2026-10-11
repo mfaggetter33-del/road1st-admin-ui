@@ -1,0 +1,56 @@
+name: ROAD 1ST Owner Fleet Portal (Staging Only)
+on:
+  push:
+    branches:
+      - feature/owner-fleet-inspection-20261011
+  pull_request:
+    branches:
+      - feature/secure-driver-replacement-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-pages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Parse scripts and validate owner fleet navigation contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          for name in ('owner.html','index.html'):
+              html=Path(name).read_text()
+              ids=re.findall(r'\bid=["\']([^"\']+)["\']',html)
+              assert len(ids)==len(set(ids)),(name,'duplicate IDs')
+              scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S|re.I)
+              for index,code in enumerate(scripts):
+                  if not code.strip():
+                      continue
+                  path=Path('/tmp/road1st-owner-'+name+str(index)+'.js')
+                  path.write_text(code)
+                  subprocess.run(['node','--check',str(path)],check=True)
+              assert scripts,(name,'no inline JS')
+          owner=Path('owner.html').read_text()
+          fleet=Path('index.html').read_text()
+          assert 'Open full fleet dashboard (Read-Only)' in owner
+          assert 'owner_inspection_start' in owner
+          assert 'sessionStorage.setItem("r1_owner_fleet_inspection"' in owner
+          assert 'location.assign("index.html?mode=fleet&owner_inspection=1&fleet_id="' in owner
+          for token in ['bootstrapOwnerInspection','owner_inspection_status',
+             'owner_inspection_full_control','owner_inspection_readonly',
+             'owner_inspection_close','confirm_replace_phone:true',
+             'Read-Only inspection','ownerInspectionBack',
+             'action:"create_enrolment"','action:"replace_phone"']:
+              assert token in fleet,('missing',token)
+          assert 'fleetSelect").disabled=true' in fleet
+          assert '["Recommended","Strict","Custom"]' in fleet
+          print('ROAD 1ST Owner/Fleet UI syntax and navigation contract passed (source-level only).')
+          PY
+      - name: Verify supporting 32-language files unchanged by owner work
+        run: |
+          node --check portal-i18n.js
+          node check-portal-locales.cjs

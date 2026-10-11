@@ -121,7 +121,18 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="detailFields" class="details"></div>
 <div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
 <p id="fleetStatusNote" class="notice"></p>
-<p class="sub" style="margin:14px 0 0">Open fleet data only when needed for testing or a customer support request.</p>
+<div class="row-actions"><button id="openOwnerFleetDashboard" type="button" class="purple">Open full fleet dashboard (Read-Only)</button><button id="inspectFleet" type="button" class="teal">Quick record inspection</button></div>
+<div id="ownerFleetInspection" class="hidden" aria-live="polite">
+<p id="ownerFleetInspectionStatus" class="notice">ROAD 1ST OWNER — Read-Only fleet inspection. No changes permitted in this view.</p>
+<div id="ownerFleetInspectionDetails" class="details"></div>
+<h3>Vehicles</h3><div id="ownerFleetInspectionVehicles" class="rows"></div>
+<h3>Drivers and enrolled devices</h3><div id="ownerFleetInspectionDrivers" class="rows"></div>
+<h3>Fleet records</h3><div class="row-actions"><label for="ownerFleetRecordCategory">Filter records</label><select id="ownerFleetRecordCategory"><option value="all">All records</option><option value="Journeys">Journeys</option><option value="Walkaround">Walkaround</option><option value="App blocking">App blocking</option><option value="Setup">Setup</option><option value="Ferry mode">Ferry mode</option><option value="Other">Other</option><option value="Fuel receipts">Fuel receipts</option><option value="Defect photos">Defect photos</option></select><button id="ownerFleetReloadRecords" type="button">Refresh records</button></div>
+<div id="ownerFleetInspectionRecords" class="rows"></div>
+<button id="closeFleetInspection" type="button">Close inspection</button>
+</div>
+<div class="row-actions"><span id="ownerFleetMode" class="pill">Mode: Read-Only</span><button id="ownerFleetEnableFull" type="button" class="purple hidden">Request Full Control</button><button id="ownerFleetReturnReadOnly" type="button" class="hidden">Return to Read-Only</button></div>
+<p id="ownerFleetModeNotice" class="notice">Quick record inspection is Read-Only. To request Full Control, use Open full fleet dashboard above.</p>
 </div>
 <div class="panel">
 <div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
@@ -220,6 +231,89 @@ function renderCompanies(){
  if(!pilots.length)pilotArea.appendChild(txt("p","No internal testing fleets.","empty"));
  pilots.forEach(function(f){addFleetRow(pilotArea,f,true)});
 }
+async function openOwnerFleetDashboard(f){
+ var b=el("openOwnerFleetDashboard");
+ b.disabled=true;
+ status("Opening "+f.name+" in the Fleet Portal…");
+ try {
+  // The existing Fleet Portal shares this tab's sessionStorage with Owner.
+  // Do not transmit credentials or inspection capability in the URL.
+  var started=await api(F,{method:"POST",
+   body:JSON.stringify({action:"owner_inspection_start",fleet_id:f.id})});
+  if(!started.inspection_id||started.fleet_id!==f.id||started.mode!=="readonly")
+   throw Error("The server did not issue a fleet-specific Read-Only inspection.");
+  sessionStorage.setItem("r1_owner_fleet_inspection",JSON.stringify({
+   inspection_id:started.inspection_id,fleet_id:f.id}));
+  location.assign("index.html?mode=fleet&owner_inspection=1&fleet_id="+encodeURIComponent(f.id));
+ }catch(e){
+  el("ownerFleetModeNotice").textContent="Could not open fleet dashboard: "+(e.message||"Request failed");
+  status("Owner fleet dashboard unavailable.");
+  b.disabled=false;
+ }
+}
+var inspectionSequence=0, inspectionFleet=null, inspectionMode="readonly";
+function resetInspectionMode(){inspectionMode="readonly";el("ownerFleetMode").textContent="Mode: Read-Only";el("ownerFleetEnableFull").classList.add("hidden");el("ownerFleetReturnReadOnly").classList.add("hidden");el("ownerFleetModeNotice").textContent="Quick inspection is Read-Only. Full Control is available for supported actions in the full Fleet Dashboard."}
+async function loadInspectionRecords(f,sequence){
+ var category=el("ownerFleetRecordCategory").value;
+ var url=F+"?kind=records&fleet_id="+encodeURIComponent(f.id)+"&category="+encodeURIComponent(category);
+ var response=await api(url);
+ if(sequence!==inspectionSequence)return;
+ if(response.fleet_id!==f.id)throw Error("Fleet record response did not match selected fleet");
+ var area=el("ownerFleetInspectionRecords"),items=response.records;
+ area.textContent="";
+ if(!Array.isArray(items))throw Error("Unexpected records response");
+ if(!items.length)area.appendChild(txt("p","No matching records for this fleet.","empty"));
+ items.slice(0,100).forEach(function(item){
+  var row=document.createElement("div");row.className="company";
+  var info=document.createElement("div");
+  info.appendChild(txt("strong",item.category||item.kind||"Record"));
+  rowMeta(info,(item.registration||"No registration")+" · "+date(item.date));
+  if(item.description)rowMeta(info,item.description);
+  row.appendChild(info);
+  area.appendChild(row);
+ });
+ if(response.limited||items.length>100)area.appendChild(txt("p","Showing a limited number of records. Narrow the category for more results.","notice"));
+}
+async function inspectCompany(f){
+ var sequence=++inspectionSequence;
+ inspectionFleet=f;
+ resetInspectionMode();
+ el("ownerFleetInspection").classList.remove("hidden");
+ el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+f.name+" — Read-Only · Loading…";
+ el("ownerFleetInspectionDetails").textContent="";
+ el("ownerFleetInspectionDrivers").textContent="";
+ el("ownerFleetInspectionVehicles").textContent="";
+ el("ownerFleetInspectionRecords").textContent="";
+ el("ownerFleetRecordCategory").value="all";
+ try{
+  var detail=await api(F+"?fleet_id="+encodeURIComponent(f.id));
+  if(sequence!==inspectionSequence)return;
+  var fleet=detail.fleet||{};
+  if(fleet.id!==f.id)throw Error("Fleet detail response did not match selected fleet");
+  var d=el("ownerFleetInspectionDetails");
+  putDetail(d,"Fleet",fleet.name||f.name);
+  putDetail(d,"Status",fleet.status||f.status);
+  putDetail(d,"Drivers",(detail.drivers||[]).length);
+  putDetail(d,"Enrolled devices",(detail.devices||[]).length);
+  putDetail(d,"Policy",fleet.blocking_preset||"Recommended");
+  var vehicles=el("ownerFleetInspectionVehicles");
+  (detail.vehicles||[]).forEach(function(vehicle){var row=document.createElement("div");row.className="company";var info=document.createElement("div");info.appendChild(txt("strong",vehicle.registration||"Unregistered vehicle"));rowMeta(info,(vehicle.vehicle_type||"Vehicle")+" · "+(vehicle.active?"Active":"Inactive"));row.appendChild(info);vehicles.appendChild(row)});
+  if(!(detail.vehicles||[]).length)vehicles.appendChild(txt("p","No vehicles registered.","empty"));
+  var drivers=el("ownerFleetInspectionDrivers");
+  (detail.drivers||[]).forEach(function(driver){
+   var row=document.createElement("div");row.className="company";
+   var info=document.createElement("div");
+   info.appendChild(txt("strong",driver.display_name||"Unnamed driver"));
+   rowMeta(info,driver.active===true?"Active driver":"Inactive driver");
+   var deviceCount=(detail.devices||[]).filter(function(device){return device.driver_id===driver.id&&device.revoked_at==null}).length;
+   rowMeta(info,"Active devices: "+deviceCount);
+   row.appendChild(info);drivers.appendChild(row);
+  });
+  if(!(detail.drivers||[]).length)drivers.appendChild(txt("p","No drivers enrolled.","empty"));
+  await loadInspectionRecords(f,sequence);
+  if(sequence===inspectionSequence)el("ownerFleetInspectionStatus").textContent="ROAD 1ST OWNER — Viewing: "+(fleet.name||f.name)+" — Read-Only. This inspection panel does not allow changes.";
+ }catch(e){if(sequence===inspectionSequence)el("ownerFleetInspectionStatus").textContent="Inspection unavailable: "+(e.message||"Request failed")}
+}
 function showCompany(f){
  var match=applications.find(function(a){return a.fleet_id===f.id&&a.status==="approved"});
  el("detailName").textContent=f.name;
@@ -238,6 +332,9 @@ function showCompany(f){
  toggle.textContent=f.status==="suspended"?"Reactivate fleet access":"Suspend fleet access";
  toggle.onclick=eligible?function(){changeFleetStatus(f,toggle)}:null;
  el("fleetStatusNote").textContent=isPilot(f)?"Internal pilot account — excluded from routine customer suspension.":f.status==="suspended"?"Fleet management suspended. Driver safety and previously uploaded records are preserved.":"Suspension affects management access only; it does not delete records or disable driver safety.";
+ el("ownerFleetInspection").classList.add("hidden");
+ el("inspectFleet").onclick=function(){inspectCompany(f)};
+ el("openOwnerFleetDashboard").onclick=function(){openOwnerFleetDashboard(f)};
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
 }
@@ -528,7 +625,16 @@ el("refresh").onclick=function(){refresh().catch(function(){})};
  el("releasePublish").onclick=publishRelease;
 el("refreshCompliance").onclick=function(){loadCompliance()};
 el("saveCompliance").onclick=saveCompliance;
-el("closeDetail").onclick=function(){el("companyDetail").classList.add("hidden")};
+el("closeDetail").onclick=function(){++inspectionSequence;el("companyDetail").classList.add("hidden")};
+el("closeFleetInspection").onclick=function(){++inspectionSequence;el("ownerFleetInspection").classList.add("hidden")};
+el("ownerFleetEnableFull").onclick=async function(){
+ if(!inspectionFleet)return;
+ var answer=await ownerDialog({title:"Full Control — "+inspectionFleet.name,subject:"Owner support access",message:"Full Control can change fleet records. Every owner change must be audited. This feature remains locked until the server-side authorization and audit implementation is verified.",confirmLabel:"Acknowledge"});
+ if(answer.confirmed)el("ownerFleetModeNotice").textContent="Full Control not yet enabled: secure server enforcement and audit verification are required. Read-Only remains active.";
+};
+el("ownerFleetReturnReadOnly").onclick=resetInspectionMode;
+el("ownerFleetReloadRecords").onclick=function(){if(inspectionFleet)loadInspectionRecords(inspectionFleet,inspectionSequence).catch(function(e){el("ownerFleetInspectionStatus").textContent="Records unavailable: "+e.message})};
+el("ownerFleetRecordCategory").onchange=function(){el("ownerFleetReloadRecords").click()};
 el("logout").onclick=function(){S=null;sessionStorage.removeItem("r1a");location.reload()};
 if(S)refresh().catch(function(){});
 })();

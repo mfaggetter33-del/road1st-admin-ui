@@ -81,7 +81,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <body>
 <header><div class="wrap head">
 <div class="brand"><img src="road1st-logo.svg" alt="ROAD 1ST logo"><div><strong>ROAD 1ST</strong><small>Owner Dashboard · Business management</small></div></div>
-<div class="actions"><a class="button" href="./?mode=fleet">Open Fleet Portal (testing)</a><button id="logout" class="hidden" type="button">Sign out</button></div>
+<div class="actions"><button id="logout" class="hidden" type="button">Sign out</button></div>
 </div></header>
 <main class="wrap">
 <section class="panel login" id="login">
@@ -119,12 +119,12 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="companyDetail" class="panel hidden">
 <div class="panel-head"><h2 id="detailName">Company</h2><button id="closeDetail" type="button">Close</button></div>
 <div id="detailFields" class="details"></div>
-<div class="row-actions"><a id="openCompanyFleet" class="button teal" href="./?mode=fleet">Open this company in Fleet Portal</a><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
+<div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
 <p id="fleetStatusNote" class="notice"></p>
 <p class="sub" style="margin:14px 0 0">Open fleet data only when needed for testing or a customer support request.</p>
 </div>
 <div class="panel">
-<div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an invitation.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
+<div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
 <div id="applications" class="rows" aria-live="polite"></div>
 </div>
 <section class="panel" id="ownershipCompliance">
@@ -166,7 +166,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 (function(){"use strict";
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",
  K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",
- O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",U=P+"/functions/v1/road1st-fleet-updates",
+ O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",U=P+"/functions/v1/road1st-fleet-updates",E=P+"/functions/v1/road1st-fleet-invite-email",
  S=null, fleets=[], applications=[], approvedRelease=null;
 var el=function(id){return document.getElementById(id)};
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
@@ -232,7 +232,7 @@ function showCompany(f){
  putDetail(area,"Contact email",match?match.contact_email:"Not recorded in application");
  putDetail(area,"Expected vehicles",match&&match.expected_vehicles?match.expected_vehicles:"Not supplied");
  putDetail(area,"Fleet ID",f.id);
- el("openCompanyFleet").href="./?mode=fleet&fleet_id="+encodeURIComponent(f.id);
+ 
  var toggle=el("toggleFleetStatus"),eligible=!isPilot(f)&&["active","suspended"].includes(f.status);
  toggle.className=(f.status==="suspended"?"teal":"purple")+(eligible?"":" hidden");
  toggle.textContent=f.status==="suspended"?"Reactivate fleet access":"Suspend fleet access";
@@ -240,6 +240,30 @@ function showCompany(f){
  el("fleetStatusNote").textContent=isPilot(f)?"Internal pilot account — excluded from routine customer suspension.":f.status==="suspended"?"Fleet management suspended. Driver safety and previously uploaded records are preserved.":"Suspension affects management access only; it does not delete records or disable driver safety.";
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function sendFleetInvitation(application){
+ if(application.status!=="approved"||!application.fleet_id)return status("Approve the company first.");
+ var confirmation=await ownerDialog({
+  title:"Send ROAD 1ST Fleet invitation",
+  subject:application.company_name,
+  message:"Send an approval email from ROAD 1ST to:\n"+application.contact_email+
+   "\n\nThe customer will receive a Fleet Portal registration link. Sending requires the ROAD 1ST email service to be configured.",
+  confirmLabel:"Send invitation"
+ });
+ if(!confirmation.confirmed)return;
+ status("Requesting ROAD 1ST invitation email…");
+ try{
+  var result=await api(E,{method:"POST",body:JSON.stringify({
+   action:"send_approved_invitation",application_id:application.id
+  })});
+  if(result.status!=="accepted_for_delivery")throw Error("Email not accepted by sending provider.");
+  status("Sending provider accepted the email to "+result.recipient+". Inbox delivery is not yet confirmed.");
+ }catch(e){
+  var error=e.message||"Unknown error";
+  if(error==="email_delivery_not_configured")error="Outgoing ROAD 1ST email is not configured yet. Nothing was sent.";
+  if(error==="email_recently_requested")error="A recent invitation request is already recorded. Try later.";
+  status("Email NOT sent: "+error);
+ }
 }
 function copyInvitation(a){
  var message="ROAD 1ST Fleet - Account approved\n\nHello "+a.contact_name+",\n\nYour company, "+a.company_name+", is approved for ROAD 1ST Fleet.\n\nOpen https://mfaggetter33-del.github.io/road1st-admin-ui/\nSelect First time? Create account and use this exact email: "+a.contact_email+"\nChoose a password, verify your email, and sign in.\n\nNo payment has been set up.\n\nROAD 1ST";
@@ -368,6 +392,7 @@ function renderApplications(){
   var edit=button(a.decline_reason?"Edit reason":"Add reason",function(){ownerDecision(a,"save_decline_reason",edit)});
   actions.appendChild(reconsider);actions.appendChild(edit);
  }else if(a.status==="approved"){
+  actions.appendChild(button("Send invitation email",function(){sendFleetInvitation(a)},"teal"));
   actions.appendChild(button("Copy invitation",function(){copyInvitation(a)}));
  }
  var clear=button("Clear",function(){ownerDecision(a,"clear",clear)});

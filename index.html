@@ -1529,7 +1529,7 @@ async function replaceFleetDriverPhone(driver){
   status.textContent=reportT("Creating replacement QR…");
   try{
     var d=await api(F,{method:"POST",body:JSON.stringify({
-      action:"replace_phone",fleet_id:fleetId,driver_id:driver.id
+      action:"replace_phone",fleet_id:fleetId,driver_id:driver.id,confirm_replace_phone:true
     })});
     showFleetDriverQr(d,true);
     status.textContent=reportT("Replacement QR ready. Old phone access revoked.");
@@ -1917,7 +1917,7 @@ function updateOwnerInspectionUi(){
  document.getElementById("ownerInspectionTitle").textContent="ROAD 1ST OWNER — Viewing: "+name;
  var editable=ownerInspection.mode==="full_control";
  document.getElementById("ownerInspectionDescription").textContent=editable
-  ?"Full Control active for this fleet only. Changes to supported fleet settings, vehicles and fuel cards are audited. Other owner management actions remain locked."
+  ?"Full Control active for this fleet only. Fleet settings, vehicles, drivers, one-time enrolment QR, phone replacement and fuel-card changes are audited."
   :"Read-Only active — inspect fleet records, drivers, vehicles, fuel receipts and defects without changing them.";
  document.getElementById("ownerInspectionFull").classList.toggle("hidden",editable);
  document.getElementById("ownerInspectionReadOnly").classList.toggle("hidden",!editable);
@@ -1927,10 +1927,11 @@ function updateOwnerInspectionUi(){
   "newFuelCardName","addFleetFuelCard","newVehicleRegistration","newVehicleType",
   "newVehicleUnit","addFleetVehicle"];
  editableControls.forEach(function(id){var node=document.getElementById(id);if(node)node.disabled=!editable});
- var unsupported=["createEnrolment","newDriverName","newDriverPhone"];
- unsupported.forEach(function(id){var node=document.getElementById(id);if(node)node.disabled=true});
+ ["createEnrolment","newDriverName","newDriverPhone"].forEach(function(id){
+  var node=document.getElementById(id);if(node)node.disabled=!editable;
+ });
  // Dynamically rendered action buttons are also checked by the server.
- var auditedActions=new Set(["edit_vehicle","remove_vehicle","archive_fuel_card","update_driver_phone","revoke_device"]);
+ var auditedActions=new Set(["edit_vehicle","remove_vehicle","archive_fuel_card","update_driver_phone","revoke_device","replace_phone"]);
  ["fleetVehicleList","fleetFuelCardList","fleetDriverList","deviceList"].forEach(function(id){
   var node=document.getElementById(id);if(!node)return;
   node.querySelectorAll("button").forEach(function(b){

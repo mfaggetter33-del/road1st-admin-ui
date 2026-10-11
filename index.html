@@ -619,6 +619,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 </div>
 <div class="fleetgrid">
 <div><label>Driver name</label><input id="newDriverName" placeholder="Driver name"></div>
+<div><label for="newDriverPhone">Phone</label><input id="newDriverPhone" inputmode="tel" autocomplete="off" maxlength="24" placeholder="+353871234567"></div>
 <div style="align-self:end"><button id="createEnrolment" class="teal full">Create enrolment QR</button></div>
 </div>
 <div id="qrArea" class="hidden"><div id="qrMeta" class="note"></div><div id="qrSvg" class="qrbox"></div><div class="compliance-actions" style="justify-content:flex-end"><button id="closeEnrolmentQr" class="secondary" type="button">Close</button></div></div>
@@ -668,6 +669,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   <div class="table" style="overflow-x:auto"><table><thead id="fleetRecordHead"></thead><tbody id="fleetRecordBody"></tbody></table></div>
 </div>
 <div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
+<div class="reviewlist" id="fleetDriverAccounts"><strong>Driver</strong><div id="driverLookupExplanation" class="note"></div><input id="fleetDriverFind" autocomplete="off" aria-label="Find driver" placeholder="Search driver name or phone"><div id="fleetDriverList" class="note"></div></div>
 <div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
 <div class="reviewlist" id="fleetUpdates">
   <strong>Fleet updates</strong>
@@ -1306,6 +1308,7 @@ function renderFleet(d){
     line.appendChild(name);line.appendChild(remove);fuelList.appendChild(line);
   });
   renderFleetVehicles();
+  renderFleetDriverAccounts();
   fleetRecordItems=[];
   document.getElementById("fleetRecordBody").textContent="";
   document.getElementById("fleetRecordCount").textContent="";
@@ -1764,6 +1767,7 @@ document.getElementById("closeDriverUpdateQr").onclick=function(){
   document.getElementById("updateQrArea").classList.add("hidden");
 };
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
+document.getElementById("fleetDriverFind").oninput=renderFleetDriverAccounts;
 document.getElementById("saveWalkaroundRequirement").onclick=saveWalkaroundRequirement;
 document.getElementById("closeEnrolmentQr").onclick=function(){document.getElementById("qrArea").classList.add("hidden");document.getElementById("qrSvg").textContent="";document.getElementById("qrMeta").textContent="";};
 

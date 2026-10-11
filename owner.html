@@ -121,7 +121,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div id="detailFields" class="details"></div>
 <div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
 <p id="fleetStatusNote" class="notice"></p>
-<div class="row-actions"><button id="inspectFleet" type="button" class="teal">Inspect fleet records (Read-Only)</button></div>
+<div class="row-actions"><button id="openOwnerFleetDashboard" type="button" class="purple">Open full fleet dashboard (Read-Only)</button><button id="inspectFleet" type="button" class="teal">Quick record inspection</button></div>
 <div id="ownerFleetInspection" class="hidden" aria-live="polite">
 <p id="ownerFleetInspectionStatus" class="notice">ROAD 1ST OWNER — Read-Only fleet inspection. No changes permitted in this view.</p>
 <div id="ownerFleetInspectionDetails" class="details"></div>
@@ -231,6 +231,26 @@ function renderCompanies(){
  if(!pilots.length)pilotArea.appendChild(txt("p","No internal testing fleets.","empty"));
  pilots.forEach(function(f){addFleetRow(pilotArea,f,true)});
 }
+async function openOwnerFleetDashboard(f){
+ var b=el("openOwnerFleetDashboard");
+ b.disabled=true;
+ status("Opening "+f.name+" in the Fleet Portal…");
+ try {
+  // The existing Fleet Portal shares this tab's sessionStorage with Owner.
+  // Do not transmit credentials or inspection capability in the URL.
+  var started=await api(F,{method:"POST",
+   body:JSON.stringify({action:"owner_inspection_start",fleet_id:f.id})});
+  if(!started.inspection_id||started.fleet_id!==f.id||started.mode!=="readonly")
+   throw Error("The server did not issue a fleet-specific Read-Only inspection.");
+  sessionStorage.setItem("r1_owner_fleet_inspection",JSON.stringify({
+   inspection_id:started.inspection_id,fleet_id:f.id}));
+  location.assign("index.html?mode=fleet&owner_inspection=1&fleet_id="+encodeURIComponent(f.id));
+ }catch(e){
+  el("ownerFleetModeNotice").textContent="Could not open fleet dashboard: "+(e.message||"Request failed");
+  status("Owner fleet dashboard unavailable.");
+  b.disabled=false;
+ }
+}
 var inspectionSequence=0, inspectionFleet=null, inspectionMode="readonly";
 function resetInspectionMode(){inspectionMode="readonly";el("ownerFleetMode").textContent="Mode: Read-Only";el("ownerFleetEnableFull").classList.remove("hidden");el("ownerFleetReturnReadOnly").classList.add("hidden");el("ownerFleetModeNotice").textContent="Read-Only is active. No fleet changes are permitted in this inspection panel."}
 async function loadInspectionRecords(f,sequence){
@@ -314,6 +334,7 @@ function showCompany(f){
  el("fleetStatusNote").textContent=isPilot(f)?"Internal pilot account — excluded from routine customer suspension.":f.status==="suspended"?"Fleet management suspended. Driver safety and previously uploaded records are preserved.":"Suspension affects management access only; it does not delete records or disable driver safety.";
  el("ownerFleetInspection").classList.add("hidden");
  el("inspectFleet").onclick=function(){inspectCompany(f)};
+ el("openOwnerFleetDashboard").onclick=function(){openOwnerFleetDashboard(f)};
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
 }

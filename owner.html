@@ -125,7 +125,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 </div>
 <div class="panel">
 <div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
-<div id="applications" class="rows" aria-live="polite"></div>
+<p id="ownerEmailReadiness" class="notice" role="status">Checking ROAD 1ST email configuration…</p><div id="applications" class="rows" aria-live="polite"></div>
 </div>
 <section class="panel" id="ownershipCompliance">
 <div class="panel-head"><div><h2>Ownership &amp; compliance</h2><p class="sub">Business ownership, contacts and review history. Owner-only information; not part of any fleet account.</p></div><button id="refreshCompliance" type="button">Refresh compliance</button></div>
@@ -167,7 +167,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",
  K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",
  O=P+"/functions/v1/road1st-fleet-onboarding",F=P+"/functions/v1/road1st-fleet-admin-api",A=P+"/functions/v1/road1st-admin-api",U=P+"/functions/v1/road1st-fleet-updates",E=P+"/functions/v1/road1st-fleet-invite-email",
- S=null, fleets=[], applications=[], approvedRelease=null;
+ S=null, fleets=[], applications=[], approvedRelease=null, emailConfigured=false, emailAttempts={};
 var el=function(id){return document.getElementById(id)};
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
@@ -241,6 +241,15 @@ function showCompany(f){
  el("companyDetail").classList.remove("hidden");
  el("companyDetail").scrollIntoView({behavior:"smooth",block:"start"});
 }
+async function loadEmailReadiness(){
+ var data=await api(E+"?kind=status");
+ emailConfigured=data.credentials_configured===true;
+ emailAttempts=data.latest_attempts||{};
+ el("ownerEmailReadiness").textContent=emailConfigured
+  ?"Sending credentials detected. Verify r1st.ie and test delivery before sending customer invitations."
+  :"Email sending not yet configured. No automatic approval invitations have been sent.";
+ renderApplications();
+}
 async function sendFleetInvitation(application){
  if(application.status!=="approved"||!application.fleet_id)return status("Approve the company first.");
  var confirmation=await ownerDialog({
@@ -258,6 +267,7 @@ async function sendFleetInvitation(application){
   })});
   if(result.status!=="accepted_for_delivery")throw Error("Email not accepted by sending provider.");
   status("Sending provider accepted the email to "+result.recipient+". Inbox delivery is not yet confirmed.");
+  await loadEmailReadiness();
  }catch(e){
   var error=e.message||"Unknown error";
   if(error==="email_delivery_not_configured")error="Outgoing ROAD 1ST email is not configured yet. Nothing was sent.";
@@ -392,7 +402,16 @@ function renderApplications(){
   var edit=button(a.decline_reason?"Edit reason":"Add reason",function(){ownerDecision(a,"save_decline_reason",edit)});
   actions.appendChild(reconsider);actions.appendChild(edit);
  }else if(a.status==="approved"){
-  actions.appendChild(button("Send invitation email",function(){sendFleetInvitation(a)},"teal"));
+  var last=emailAttempts[a.id];
+  rowMeta(info,"Email invitation: "+(!last?"Not yet requested":
+   last.state==="provider_accepted"?"Accepted by provider "+date(last.at)+" (inbox not confirmed)":
+   last.state==="queued"?"Sending request queued":
+   last.state==="rejected"?"Provider rejected the message":
+   "Result uncertain — check before retrying"));
+  var send=button("Send invitation email",function(){sendFleetInvitation(a)},"teal");
+  send.disabled=!emailConfigured;
+  send.title=emailConfigured?"Send through ROAD 1ST email service":"Email service not yet configured";
+  actions.appendChild(send);
   actions.appendChild(button("Copy invitation",function(){copyInvitation(a)}));
  }
  var clear=button("Clear",function(){ownerDecision(a,"clear",clear)});
@@ -488,6 +507,7 @@ async function refresh(){
   status("Owner records updated.");
   await loadCompliance();
    try{await loadRelease()}catch(e){releaseMessage("Release status: "+e.message)}
+   try{await loadEmailReadiness()}catch(e){el("ownerEmailReadiness").textContent="Email status unavailable: "+e.message}
  }catch(e){ownerVisible(false);el("loginError").textContent=e.message;status("");throw e}
 }
 async function signin(e){

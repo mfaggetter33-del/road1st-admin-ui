@@ -644,16 +644,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div class="reviewlist" id="fleetUpdates">
   <strong>Fleet updates</strong>
   <div id="pilotReleaseMeta" class="note">No approved pilot APK yet.</div>
-  <div id="pilotPublishArea" class="hidden">
-    <div class="note">Only the ROAD 1ST owner can publish a signed pilot APK.</div>
-    <div class="fleetgrid">
-      <div><label>Version name</label><input id="pilotVersionName" placeholder="2.99-pilot"></div>
-      <div><label>Version code</label><input id="pilotVersionCode" inputmode="numeric" placeholder="99"></div>
-    </div>
-    <div><label>Signed APK</label><input id="pilotApkFile" type="file" accept=".apk,application/vnd.android.package-archive"></div>
-    <div class="compliance-actions"><button id="publishPilotApk" class="secondary" type="button">Publish APK</button></div>
-    <div id="pilotPublishStatus" class="note" role="status" aria-live="polite"></div>
-  </div>
+  <div class="note">Only ROAD 1ST publishes approved APK updates from the Owner page. Use the QR below for a driver who needs a manual reinstall while parked.</div>
   <div id="updateQrArea" class="hidden">
     <strong id="updateQrHeading">Update QR</strong>
     <div id="updateQrText" class="note"></div>
@@ -1247,45 +1238,10 @@ function showDeviceUpdate(device,driver){
 async function refreshLatestPilot(){
   var d=await api(U);
   latestPilotRelease=d.latest||null;
-  document.getElementById("pilotPublishArea").classList.toggle("hidden",!d.can_publish);
   document.getElementById("pilotReleaseMeta").textContent=latestPilotRelease
     ?reportT("Version name")+": "+latestPilotRelease.version_name+" · "+bytes(latestPilotRelease.size_bytes)
     :reportT("No approved pilot APK yet.");
   if(fleetData)renderFleet(fleetData);
-}
-function pilotPublishMessage(message){
-  document.getElementById("pilotPublishStatus").textContent=message;
-  status.textContent=message;
-}
-async function publishPilotApk(){
-  var input=document.getElementById("pilotApkFile"),file=input.files&&input.files[0],
-    name=document.getElementById("pilotVersionName").value.trim(),
-    code=Number(document.getElementById("pilotVersionCode").value),
-    button=document.getElementById("publishPilotApk");
-  if(!file||!file.name.toLowerCase().endsWith(".apk")){
-    pilotPublishMessage(reportT("Select signed APK"));return;
-  }
-  if(!/^[a-zA-Z0-9._-]{3,48}$/.test(name)){
-    pilotPublishMessage(reportT("Enter a valid version name."));return;
-  }
-  if(!Number.isSafeInteger(code)||code<1){
-    pilotPublishMessage(reportT("Enter the APK version code."));return;
-  }
-  if(file.size<1024||file.size>25165824){pilotPublishMessage("APK must be under 24 MB.");return;}
-  button.disabled=true;pilotPublishMessage(reportT("Publishing APK"));
-  try{
-    if(!S||!S.expires_at||Date.now()>=S.expires_at)await refreshToken();
-    var requestUrl=U+"?version="+encodeURIComponent(name)+"&code="+encodeURIComponent(String(code));
-    var opt={method:"POST",headers:{apikey:K,Authorization:"Bearer "+S.access_token,
-         "Content-Type":"application/vnd.android.package-archive"},body:file};
-    var response=await fetch(requestUrl,opt);
-    if(response.status===401){await refreshToken();opt.headers.Authorization="Bearer "+S.access_token;response=await fetch(requestUrl,opt)}
-    var data={};try{data=await response.json()}catch(e){}
-    if(!response.ok)throw Error(data.error||"Upload failed");
-    input.value="";
-    await refreshLatestPilot();
-    pilotPublishMessage(reportT("Published")+": "+name);
-  }catch(e){pilotPublishMessage(e.message||"Upload failed")}finally{button.disabled=false}
 }
 async function copyDriverUpdateLink(){
   if(!latestPilotRelease)return;
@@ -1640,31 +1596,11 @@ async function load(k){C=k;status.textContent="Loading…";document.getElementBy
 async function counts(){await Promise.all(["reports","fuel","defects"].map(async function(k){try{var d=await api(A+"?kind="+k+"&limit=1");document.getElementById(k+"Count").textContent=d.total}catch(e){}}))}
 async function show(){if(new URLSearchParams(location.search).get("mode")==="fleet")C="fleet";login.classList.add("hidden");dash.classList.remove("hidden");try{await api(O,{method:"POST",body:JSON.stringify({action:"claim"})})}catch(e){}var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});document.getElementById("ownerDashboardLink").classList.toggle("hidden",!platformAccess);if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
 document.getElementById("saveCompliance").onclick=saveCompliance;
-document.getElementById("publishPilotApk").onclick=publishPilotApk;
 document.getElementById("shareDriverUpdate").onclick=shareDriverUpdateLink;
 document.getElementById("copyDriverUpdate").onclick=copyDriverUpdateLink;
 document.getElementById("downloadDriverUpdateQr").onclick=downloadDriverUpdateQr;
 document.getElementById("closeDriverUpdateQr").onclick=function(){
   document.getElementById("updateQrArea").classList.add("hidden");
-};
-document.getElementById("pilotApkFile").onchange=function(){
-  document.getElementById("pilotPublishStatus").textContent="";
-  var filename=this.files&&this.files[0]&&this.files[0].name||"",
-      match=/^ROAD1ST-(\d+\.\d+(?:\.\d+)?)-pilot\.apk$/i.exec(filename),
-      versionName=document.getElementById("pilotVersionName"),
-      versionCode=document.getElementById("pilotVersionCode");
-  // The filename alone cannot confirm Android's internal versionCode.
-  // Only auto-fill codes for builds verified in our signed pilot workflow.
-  if(match){
-    versionName.value=match[1]+"-pilot";
-    if(match[1]==="2.99.4")versionCode.value="103";
-    else if(match[1]==="2.99.3")versionCode.value="102";
-    else if(/^\d+\.\d+$/.test(match[1]))versionCode.value=match[1].split(".")[1];
-    else versionCode.value="";
-  }else{
-    versionName.value="";
-    versionCode.value="";
-  }
 };
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
 document.getElementById("saveWalkaroundRequirement").onclick=saveWalkaroundRequirement;

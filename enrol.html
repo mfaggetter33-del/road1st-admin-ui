@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>ROAD 1ST — Fleet invitation</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#09080f;color:#f7f5ff;display:flex;align-items:center;justify-content:center;padding:18px}
+main{width:min(100%,450px);padding:28px;border:1px solid #3e325c;border-radius:20px;background:#171324;box-shadow:0 12px 38px #0008}
+h1{font-size:28px;margin:0 0 4px;letter-spacing:1px}h2{font-size:20px;margin:20px 0 8px}
+.accent{color:#56c8c4}p{line-height:1.5;color:#ccc6df}
+button{width:100%;padding:16px;border-radius:13px;border:0;background:#54c8c4;color:#102228;font-weight:750;font-size:16px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+small{display:block;margin-top:16px;color:#aaa4be;line-height:1.45}
+</style>
+</head>
+<body>
+<main>
+<h1>ROAD <span class="accent">1ST</span></h1>
+<h2>Fleet invitation</h2>
+<p id="status" role="status">Checking your invitation…</p>
+<p>Open ROAD 1ST to <strong>review the company, driver details and Fleet privacy notice</strong>. You can accept or decline inside the app. Opening this page does not enrol you.</p>
+<button type="button" id="open" disabled>Review invitation in ROAD 1ST</button>
+<small>Invitations are single-use and normally expire after 30 minutes. Your phone needs ROAD 1ST installed. Do not forward this private invitation to anyone else. The company will not receive private journey information merely because you open this page.</small>
+</main>
+<script>
+"use strict";
+(function(){
+  const status=document.getElementById("status");
+  const open=document.getElementById("open");
+  // URL fragment avoids sending the one-time token to the website server.
+  const fragment=location.hash.replace(/^#/,"");
+  const parts=new URLSearchParams(fragment);
+  const token=parts.get("token")||"";
+  // Remove the token from the visible URL/history after reading it.
+  if(history.replaceState)history.replaceState(null,"",location.pathname+location.search);
+  if(!/^[A-Za-z0-9_-]{40,64}$/.test(token)){
+    status.textContent="This invitation link is missing or invalid. Ask your transport manager for a new one.";
+    return;
+  }
+  status.textContent="Invitation link detected. Review it securely in the ROAD 1ST app.";
+  open.disabled=false;
+  open.addEventListener("click",function(){
+    location.href="road1st://enrol?token="+encodeURIComponent(token);
+  });
+})();
+</script>
+</body>
+</html>

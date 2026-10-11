@@ -1211,12 +1211,12 @@ var fleetCustomRecommended=[
 "com.android.chrome","com.sec.android.app.sbrowser","com.google.android.gm",
 "com.microsoft.office.outlook"
 ];
-var fleetCustomDraft=new Set(),fleetCustomCompanyId="";
+var fleetCustomDraft=new Set(),fleetCustomManaged=new Set(),fleetCustomCompanyId="";
 function renderCustomFleetApps(){
  var area=document.getElementById("fleetCustomApps");area.textContent="";
  var catalogPackages=new Set(fleetCustomAppsCatalog.map(x=>x[1]));
  var entries=fleetCustomAppsCatalog.slice();
- for(var pkg of fleetCustomDraft){
+ for(var pkg of new Set([...fleetCustomDraft,...fleetCustomManaged])){
    if(!catalogPackages.has(pkg))entries.push([pkg,pkg]);
  }
  entries.sort(function(a,b){return a[0].localeCompare(b[0])});
@@ -1244,6 +1244,8 @@ function configureFleetCustom(d){
  var configured=current&&current.custom_policy_updated_at;
  fleetCustomDraft=new Set(configured && Array.isArray(current.custom_blocked_packages)
    ?current.custom_blocked_packages:fleetCustomRecommended);
+ fleetCustomManaged=new Set(configured && Array.isArray(current.custom_managed_packages)
+   ?current.custom_managed_packages:[]);
  renderCustomFleetApps();
  updateFleetCustomVisibility();
 }
@@ -1259,8 +1261,11 @@ function addFleetCustomPackage(){
  if(!/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/.test(pkg)||pkg.length>180){
    status.textContent="Enter an Android app package ID, such as com.example.workapp.";return;
  }
- if(fleetCustomDraft.size>=250){status.textContent="Custom list limit reached.";return;}
- fleetCustomDraft.add(pkg);field.value="";renderCustomFleetApps();
+ if(fleetCustomDraft.size>=250||fleetCustomManaged.size>=250){status.textContent="Custom list limit reached.";return;}
+ if(["com.google.android.dialer","com.samsung.android.dialer","com.android.dialer"].includes(pkg)){
+   status.textContent="Emergency calling must remain available.";return;
+ }
+ fleetCustomManaged.add(pkg);fleetCustomDraft.add(pkg);field.value="";renderCustomFleetApps();
  status.textContent="Work app added to the draft blocked list. Tap Allowed if you want it available while driving.";
 }
 function renderFleet(d){
@@ -1411,7 +1416,8 @@ async function saveFleetPolicy(){
      var blocked=Array.from(fleetCustomDraft).sort();
      if(blocked.length>250)throw Error("Custom app list is too long.");
      await api(F,{method:"POST",body:JSON.stringify({
-       action:"set_fleet_custom_apps",fleet_id:fleetId,blocked_packages:blocked
+       action:"set_fleet_custom_apps",fleet_id:fleetId,blocked_packages:blocked,
+       managed_packages:Array.from(fleetCustomManaged).sort()
      })});
    }else{
      await api(F,{method:"POST",body:JSON.stringify({

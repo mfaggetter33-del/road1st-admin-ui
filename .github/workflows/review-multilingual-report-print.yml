@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check print JavaScript
         run: node --check fleet-report-print.js
+      - name: Execute browser-print contract tests
+        run: node checks/test_fleet_print.cjs
       - name: Check print integration and all language labels
         run: |
           node - <<'NODE'

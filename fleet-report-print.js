@@ -14,7 +14,7 @@ function open(source,title,file,lang,company){
  if(company){var companyLine=d.createElement("p");companyLine.textContent=String(company);header.appendChild(companyLine);}
  var p=d.createElement("p");p.textContent=[file,(lang||"en").toUpperCase(),new Date().toLocaleString(lang||"en")].filter(Boolean).join(" • ");header.appendChild(p);d.body.appendChild(header);
  var view=source.cloneNode(true);
- view.querySelectorAll("button,a,iframe,script,form").forEach(function(e){e.remove()});
+ view.querySelectorAll("button,a,iframe,script,form,img,video,audio,object,embed,link,style").forEach(function(e){e.remove()});
  d.body.appendChild(view);d.close();w.focus();w.print();
 }
 window.ROAD1ST_FLEET_PRINT={label:function(lang){return label[lang]||label.en},open:open,languages:Object.keys(label)};

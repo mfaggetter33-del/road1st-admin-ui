@@ -682,6 +682,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
       <div><h2 id="viewerTitle">ROAD 1ST Report</h2><div id="viewerFile" class="sub"></div></div>
       <div class="viewer-actions">
         <button id="viewerPdf">Download PDF report</button>
+        <button id="viewerPrint" type="button">Print / Save as PDF</button>
         <button id="viewerDownload" class="teal">Download original</button>
         <button id="viewerClose" class="secondary">Close</button>
       </div>
@@ -728,11 +729,12 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <script src="portal-generated-report-locales.js"></script>
 <script src="portal-timeline-locales.js"></script>
 <script src="portal-i18n.js"></script>
+<script src="fleet-report-print.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
 (function(){"use strict";
 var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",A=P+"/functions/v1/road1st-admin-api",F=P+"/functions/v1/road1st-fleet-admin-api",O=P+"/functions/v1/road1st-fleet-onboarding",U=P+"/functions/v1/road1st-fleet-updates",S=null,C="reports",CURRENT_REPORT=null,CURRENT_REPORT_FILE="",createMode=false,platformAccess=true,fleetData=null,latestPilotRelease=null;
-var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),recordsTable=document.getElementById("recordsTable"),compliancePanel=document.getElementById("compliancePanel"),fleetPanel=document.getElementById("fleetPanel"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
+var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),recordsTable=document.getElementById("recordsTable"),compliancePanel=document.getElementById("compliancePanel"),fleetPanel=document.getElementById("fleetPanel"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),viewerPrint=document.getElementById("viewerPrint"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
 function clear(){S=null;sessionStorage.removeItem("r1a")}
@@ -1765,7 +1767,20 @@ document.getElementById("fleetSelect").onchange=function(){
 };
 document.getElementById("createBtn").onclick=createAccount;
 document.getElementById("modeBtn").onclick=toggleMode;
-viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
+viewerPdf.onclick=downloadPdfReport;
+function updateFleetPrintLabel(){
+  if(viewerPrint&&window.ROAD1ST_FLEET_PRINT)
+    viewerPrint.textContent=window.ROAD1ST_FLEET_PRINT.label(portalLocale());
+}
+viewerPrint.onclick=function(){
+  try{
+    if(!CURRENT_REPORT||viewer.classList.contains("hidden"))throw Error("Open a report first.");
+    window.ROAD1ST_FLEET_PRINT.open(viewerContent,viewerTitle.textContent,CURRENT_REPORT_FILE,portalLocale());
+  }catch(e){status.textContent=e.message||"Could not open the print window.";}
+};
+document.addEventListener("road1st-portal-language-change",updateFleetPrintLabel);
+updateFleetPrintLabel();
+document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
 })();
 </script>
 </body>

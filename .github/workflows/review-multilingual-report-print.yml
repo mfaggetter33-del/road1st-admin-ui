@@ -1,0 +1,36 @@
+name: Review multilingual fleet report print
+on:
+  push:
+    branches:
+      - review/multilingual-fleet-print-20261012
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check print JavaScript
+        run: node --check fleet-report-print.js
+      - name: Check print integration and all language labels
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('index.html','utf8');
+          const src=fs.readFileSync('fleet-report-print.js','utf8');
+          for(const s of ['id="viewerPrint"','src="fleet-report-print.js"','ROAD1ST_FLEET_PRINT.open(viewerContent','road1st-portal-language-change','updateFleetPrintLabel']) {
+            if(!html.includes(s))throw Error('Missing integration: '+s);
+          }
+          if(html.indexOf('src="fleet-report-print.js"')>html.indexOf('<script>'))throw Error('Print support must load before portal logic');
+          const matches=src.match(/\b[a-z]{2,3}:"/g)||[];
+          if(matches.length!==32)throw Error('Expected 32 print labels: got '+matches.length);
+          if(!src.includes('source.cloneNode(true)'))throw Error('Must use viewer report only');
+          if(!src.includes('w.print()'))throw Error('Must activate browser print');
+          console.log('PASS: integrated optional browser-native print, 32 labels, existing jsPDF untouched');
+          NODE
+      - name: Verify portal scripts
+        run: |
+          node --check portal-i18n.js
+          node --check portal-translations.js
+          node --check portal-report-translations.js

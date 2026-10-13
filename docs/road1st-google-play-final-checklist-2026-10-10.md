@@ -1,4 +1,9 @@
 # ROAD 1ST — Google Play submission checklist / handover (10 October 2026)
+
+**13 OCTOBER 2026 STATUS UPDATE:** The signed ROAD 1ST pilot is now **2.99.25-pilot** (versionCode 124; targetSdk 36), not 2.99.4. This older checklist is retained for history; Play release is **not yet approved**. Engineering status, open safety/privacy gates and today's verified security results are in the [private master checkpoint](https://github.com/mfaggetter33-del/driver-safety/blob/main/docs/ROAD1ST_SECURITY_GDPR_CHECKPOINT_2026-10-13.md). Do not treat the 10 October 'not yet deployed' statements as a current live-system audit.
+
+---
+
 Status: practical draft and evidence tracker. Not submitted to Google Play.
 
 ## Product version to describe

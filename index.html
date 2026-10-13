@@ -557,7 +557,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   <div id="fleetCustomNotice" class="note"></div>
   <div id="fleetCustomApps" class="fleet-custom-apps"></div>
   <div class="fleetgrid">
-    <div><label for="fleetCustomNewApp">Android package ID (other work app)</label><input id="fleetCustomNewApp" placeholder="com.example.workapp" autocomplete="off"></div>
+    <div><label for="fleetCustomNewApp">App package ID</label><input id="fleetCustomNewApp" placeholder="com.example.workapp" autocomplete="off"></div>
     <div style="align-self:end"><button id="fleetCustomAdd" class="secondary full" type="button">Add app</button></div>
   </div>
 </div>
@@ -655,7 +655,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     <div><label for="fleetRecordTo">To</label><input id="fleetRecordTo" type="date"></div>
     <div><label for="fleetRecordCategory">Category</label><select id="fleetRecordCategory">
       <option value="all">All categories</option>
-      <option value="Reports">All fleet reports</option>
+      <option value="Reports">Reports</option>
       <option value="Journeys">Journeys &amp; checkpoints</option>
       <option value="Walkaround">Walkaround checks</option>
       <option value="Fuel receipts">Fuel receipts</option>
@@ -682,8 +682,8 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div class="reviewlist" id="fleetUpdates">
   <strong>Fleet updates</strong>
   <div id="pilotReleaseMeta" class="note">No approved pilot APK yet.</div>
-  <div class="compliance-actions"><button type="button" id="fleetInstallApk" class="teal">Download ROAD 1ST / show APK QR</button></div>
-  <div class="note">Install ROAD 1ST first, then use a separate single-use Enrolment QR to join your authorised fleet.</div>
+  <div class="compliance-actions"><button type="button" id="fleetInstallApk" class="teal">Download QR</button></div>
+
   <div class="note">Only the ROAD 1ST owner can publish a signed pilot APK.</div>
   <div id="updateQrArea" class="hidden">
     <strong id="updateQrHeading">Update QR</strong>

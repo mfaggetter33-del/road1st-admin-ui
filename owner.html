@@ -39,6 +39,14 @@ main{padding:8px 0 50px}
 .card{padding:19px}
 .card b{font-size:30px;display:block;color:var(--teal);font-variant-numeric:tabular-nums}
 .card span{color:var(--muted)}
+/* Summary tiles are accessible toggles; expanded records use the full page width. */
+.summary-card{position:relative;display:block;width:100%;padding:19px 44px 19px 19px;text-align:left}
+.summary-card[aria-expanded="true"]{border-color:var(--teal)}
+.summary-card .summary-caret{position:absolute;right:18px;top:50%;transform:translateY(-50%);font-size:22px;color:var(--teal)}
+.summary-card[aria-expanded="true"] .summary-caret{transform:translateY(-50%) rotate(180deg)}
+.owner-category-panel{margin-top:-6px}
+.owner-category-panel h3{font-size:16px;margin:18px 0 10px}
+
 .panel{padding:22px;margin:16px 0}
 .panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .rows{display:grid;gap:10px}
@@ -96,9 +104,33 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <h1>Owner overview</h1>
 <p class="sub">Your ROAD 1ST company accounts and requests to join. Driver reports stay in the separate Fleet Portal.</p>
 <div class="cards">
-<div class="card"><b id="companyCount">—</b><span>Customer company accounts</span></div>
-<div class="card"><b id="activeCount">—</b><span>Internal pilot fleets</span></div>
-<div class="card"><b id="pendingCount">—</b><span>Applications awaiting review</span></div>
+<button type="button" class="card summary-card" id="customerSummary" aria-controls="customerGroups" aria-expanded="false"><b id="companyCount">—</b><span>Customer company accounts</span><span class="summary-caret" aria-hidden="true">⌄</span></button>
+<button type="button" class="card summary-card" id="pilotSummary" aria-controls="pilotGroups" aria-expanded="false"><b id="activeCount">—</b><span>Internal pilot fleets</span><span class="summary-caret" aria-hidden="true">⌄</span></button>
+<button type="button" class="card summary-card" id="applicationSummary" aria-controls="applicationGroups" aria-expanded="false"><b id="pendingCount">—</b><span>Applications awaiting review</span><span class="summary-caret" aria-hidden="true">⌄</span></button>
+</div>
+<div id="ownerCategoryPanels">
+<section class="panel owner-category-panel hidden" id="customerGroups" aria-label="Customer company accounts">
+<div class="panel-head"><div><h2>Customer companies</h2><p class="sub">Registered customer fleet accounts. A registered fleet is not necessarily a paying customer.</p></div><button type="button" id="refresh">Refresh</button></div>
+<div id="companies" class="rows" aria-live="polite"></div>
+</section>
+<section class="panel owner-category-panel hidden" id="pilotGroups" aria-label="Internal pilot fleets">
+<div class="panel-head"><div><h2>Internal testing fleets</h2><p class="sub">Our own ROAD 1ST pilot fleet is not a customer company.</p></div></div>
+<div id="pilotFleets" class="rows" aria-live="polite"></div>
+</section>
+<section class="panel owner-category-panel hidden" id="applicationGroups" aria-label="Applications awaiting review">
+<div class="panel-head"><div><h2>Applications awaiting review</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approving does not take payment or automatically send email.</p></div><a href="apply.html" rel="noopener" target="_blank">Application form</a></div>
+<div id="applications" class="rows" aria-live="polite"></div>
+<h3>Previously reviewed applications</h3>
+<div id="reviewedApplications" class="rows" aria-live="polite"></div>
+<p id="ownerEmailReadiness" class="notice" role="status">Checking ROAD 1ST email configuration…</p>
+</section>
+</div>
+<div id="companyDetail" class="panel hidden">
+<div class="panel-head"><h2 id="detailName">Company</h2><button id="closeDetail" type="button">Close</button></div>
+<div id="detailFields" class="details"></div>
+<div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
+<p id="fleetStatusNote" class="notice"></p>
+<p class="sub" style="margin:14px 0 0">Open fleet data only when needed for testing or a customer support request.</p>
 </div>
 <div class="panel" id="ownerReleases">
 <div class="panel-head"><div><h2>ROAD 1ST App Updates · Owner Control</h2><p class="sub">You approve one signed version for every fleet. Fleet managers have recovery QR/download access only.</p></div><button id="releaseRefresh" type="button">Refresh</button></div>
@@ -108,25 +140,6 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 <div class="details"><div><label for="releaseName">Exact version name</label><input id="releaseName" placeholder="2.99.7-pilot"></div><div><label for="releaseCode">Version code</label><input id="releaseCode" type="number" min="1" step="1" placeholder="106"></div></div>
 <label for="releaseFile">Signed APK</label><input id="releaseFile" type="file" accept=".apk,application/vnd.android.package-archive">
 <div class="row-actions" style="margin-top:12px"><button id="releasePublish" class="purple" type="button">Review and publish to all fleets</button></div><p id="releaseStatus" class="notice" role="status" aria-live="polite"></p></div>
-<div class="panel">
-<div class="panel-head"><div><h2>Customer companies</h2><p class="sub">Registered customer fleet accounts. A registered fleet is not necessarily a paying customer.</p></div><button type="button" id="refresh">Refresh</button></div>
-<div id="companies" class="rows" aria-live="polite"></div>
-</div>
-<div class="panel">
-<div class="panel-head"><div><h2>Internal testing fleets</h2><p class="sub">Our own ROAD 1ST pilot fleet is not a customer company.</p></div></div>
-<div id="pilotFleets" class="rows" aria-live="polite"></div>
-</div>
-<div id="companyDetail" class="panel hidden">
-<div class="panel-head"><h2 id="detailName">Company</h2><button id="closeDetail" type="button">Close</button></div>
-<div id="detailFields" class="details"></div>
-<div class="row-actions"><button id="toggleFleetStatus" type="button" class="purple hidden">Suspend fleet access</button></div>
-<p id="fleetStatusNote" class="notice"></p>
-<p class="sub" style="margin:14px 0 0">Open fleet data only when needed for testing or a customer support request.</p>
-</div>
-<div class="panel">
-<div class="panel-head"><div><h2>Fleet applications</h2><p class="sub">New customer enquiries from the Join ROAD 1ST Fleet form. Approval does not take payment or automatically send an email. After approval, use Send invitation email.</p></div><a href="apply.html" rel="noopener" target="_blank">View application form</a></div>
-<p id="ownerEmailReadiness" class="notice" role="status">Checking ROAD 1ST email configuration…</p><div id="applications" class="rows" aria-live="polite"></div>
-</div>
 <section class="panel" id="ownershipCompliance">
 <div class="panel-head"><div><h2>Ownership &amp; compliance</h2><p class="sub">Business ownership, contacts and review history. Owner-only information; not part of any fleet account.</p></div><button id="refreshCompliance" type="button">Refresh compliance</button></div>
 <div class="details" style="gap:12px 18px">
@@ -378,11 +391,15 @@ async function ownerDecision(a,action,b){
  }catch(e){status("Application update failed: "+e.message);b.disabled=false}
 }
 function renderApplications(){
- var area=el("applications");area.textContent="";
+ var area=el("applications"),reviewed=el("reviewedApplications");
+ area.textContent="";reviewed.textContent="";
  var pend=applications.filter(function(a){return a.status==="pending"}).length;
  el("pendingCount").textContent=pend;
- if(!applications.length){area.appendChild(txt("p","No fleet applications awaiting management.","empty"));return}
+ if(!pend)area.appendChild(txt("p","No applications awaiting review.","empty"));
+ if(!applications.some(function(a){return a.status!=="pending"}))
+  reviewed.appendChild(txt("p","No previously reviewed applications.","empty"));
  applications.forEach(function(a){
+ var target=a.status==="pending"?area:reviewed;
  var item=document.createElement("div");item.className="application";
  var info=document.createElement("div");
  info.appendChild(txt("strong",a.company_name));
@@ -417,7 +434,7 @@ function renderApplications(){
  var clear=button("Clear",function(){ownerDecision(a,"clear",clear)});
  clear.setAttribute("aria-label","Clear application for "+a.company_name);
  actions.appendChild(clear);
- item.appendChild(info);item.appendChild(actions);area.appendChild(item);
+ item.appendChild(info);item.appendChild(actions);target.appendChild(item);
  });
 }
 function complianceValue(id,value){el(id).value=value==null?"":String(value)}
@@ -533,6 +550,21 @@ async function signin(e){
   await refresh();
  }catch(e){el("loginError").textContent=e.message||"Sign in failed."}finally{b.disabled=false}
 }
+// Only one list opens at a time; each uses the same server-owned data
+// and the same company/application action handlers as before this change.
+var ownerCategories={customerSummary:"customerGroups",pilotSummary:"pilotGroups",applicationSummary:"applicationGroups"};
+function toggleOwnerCategory(selected){
+ var shouldOpen=el(ownerCategories[selected]).classList.contains("hidden");
+ Object.keys(ownerCategories).forEach(function(buttonId){
+  var expanded=buttonId===selected&&shouldOpen;
+  el(ownerCategories[buttonId]).classList.toggle("hidden",!expanded);
+  el(buttonId).setAttribute("aria-expanded",expanded?"true":"false");
+ });
+ el("companyDetail").classList.add("hidden");
+}
+Object.keys(ownerCategories).forEach(function(id){
+ el(id).addEventListener("click",function(){toggleOwnerCategory(id)});
+});
 el("loginForm").addEventListener("submit",signin);
 el("refresh").onclick=function(){refresh().catch(function(){})};
  el("releaseRefresh").onclick=function(){loadRelease().catch(function(e){releaseMessage(e.message)})};

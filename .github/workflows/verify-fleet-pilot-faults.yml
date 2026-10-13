@@ -1,0 +1,23 @@
+name: Verify ROAD 1ST Fleet Pilot Fixes
+on:
+  push:
+    branches:
+      - fix/fleet-pilot-faults-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check portal JS and per-fleet/security contracts
+        run: node checks/check_fleet_pilot_fixes.cjs
+      - name: Check portal locales
+        run: node check-portal-locales.cjs
+      - name: Check PDF report tools
+        run: node checks/test_fleet_print.cjs

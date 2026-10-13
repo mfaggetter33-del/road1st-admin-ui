@@ -1,0 +1,26 @@
+name: ROAD 1ST fleet print browser acceptance
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'fleet-report-print.js'
+      - 'checks/check_fleet_pdf_browser.cjs'
+      - '.github/workflows/verify-fleet-pdf-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  chromium-print:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Install pinned test browser
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.0
+          npx playwright install --with-deps chromium
+      - name: Render fleet PDF and verify 390px mobile action layout
+        run: node checks/check_fleet_pdf_browser.cjs

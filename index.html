@@ -542,7 +542,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div class="sub">Register ROAD 1ST phones to a fleet with a 30-minute, single-use QR code. The QR does not contain an admin password or permanent company secret.</div>
 <div class="fleetgrid">
 <div><label>Fleet</label><select id="fleetSelect"></select></div>
-<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Recommended">Recommended</option><option value="Strict">Strict</option><option value="Custom">Custom</option></select></div>
+<div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Strict">Strict</option><option value="Custom">Custom</option></select></div>
 </div>
 <div id="fleetCustomAppsArea" class="hidden">
   <div id="fleetCustomNotice" class="note"></div>
@@ -1289,7 +1289,7 @@ function renderFleet(d){
   }
   sel.textContent="";
   fleets.forEach(function(f){var o=document.createElement("option");o.value=f.id;o.textContent=f.name;if(current&&f.id===current.id)o.selected=true;sel.appendChild(o)});
-  document.getElementById("fleetPreset").value=current&&["Recommended","Strict","Custom"].includes(current.blocking_preset)?current.blocking_preset:"Recommended";
+  document.getElementById("fleetPreset").value=current&&["Strict","Custom"].includes(current.blocking_preset)?current.blocking_preset:"Strict";
   configureFleetCustom(d);
   document.getElementById("fleetWalkaroundRequired").value=current&&current.walkaround_required===true?"true":"false";
   var fuelList=document.getElementById("fleetFuelCardList");
@@ -1404,8 +1404,8 @@ async function createFleetEnrolment(){var name=document.getElementById("newDrive
 async function saveFleetPolicy(){
  var fleetId=document.getElementById("fleetSelect").value,
      preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");
- if(!["Recommended","Strict","Custom"].includes(preset)){
-   status.textContent="Choose Recommended, Strict or Custom.";return;
+ if(!["Strict","Custom"].includes(preset)){
+   status.textContent="Choose Strict or Custom.";return;
  }
  if(!fleetId||fleetId!==fleetCustomCompanyId){
    status.textContent="Choose a fleet and reload its policy.";return;

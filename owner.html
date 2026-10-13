@@ -421,12 +421,24 @@ function renderApplications(){
  });
 }
 function complianceValue(id,value){el(id).value=value==null?"":String(value)}
+function missingComplianceContacts(){
+ var missing=[];
+ if(!el("ownerEmail").value.trim())missing.push("owner email");
+ if(!el("privacyEmail").value.trim())missing.push("privacy contact email");
+ if(!el("playEmail").value.trim())missing.push("Google Play contact email");
+ return missing;
+}
+function complianceStatus(updated){
+ var missing=missingComplianceContacts();
+ var notice=missing.length?"GDPR / launch contacts incomplete: "+missing.join(", ")+".":"Required launch contact emails recorded.";
+ return (updated?"Last updated "+date(updated)+". ":"")+notice;
+}
 function renderCompliance(data){
  var p=data.profile||{};
  var fields={organisationName:p.organisation_name||"ROAD 1ST",ownerName:p.owner_name,ownerEmail:p.owner_email,ownerPhone:p.owner_phone,complianceName:p.compliance_contact_name,complianceEmail:p.compliance_contact_email,technicalName:p.technical_contact_name,technicalEmail:p.technical_contact_email,privacyEmail:p.privacy_contact_email,playEmail:p.play_console_contact_email,complianceNotes:p.notes};
  Object.keys(fields).forEach(function(id){complianceValue(id,fields[id])});
  el("routeAll").checked=p.route_all_notifications_to_owner!==false;
- el("complianceMeta").textContent=p.updated_at?"Last updated "+date(p.updated_at):"";
+ el("complianceMeta").textContent=complianceStatus(p.updated_at);
  var out=el("reviewList");out.textContent="";
  var reviews=data.reviews||[];
  if(!reviews.length){out.appendChild(txt("p","No reviews recorded yet.","empty"));return}
@@ -449,7 +461,7 @@ async function saveCompliance(){
   var values={action:"update_compliance",organisation_name:el("organisationName").value,owner_name:el("ownerName").value,owner_email:el("ownerEmail").value,owner_phone:el("ownerPhone").value,compliance_contact_name:el("complianceName").value,compliance_contact_email:el("complianceEmail").value,technical_contact_name:el("technicalName").value,technical_contact_email:el("technicalEmail").value,privacy_contact_email:el("privacyEmail").value,play_console_contact_email:el("playEmail").value,route_all_notifications_to_owner:el("routeAll").checked,notes:el("complianceNotes").value};
   await api(A,{method:"POST",body:JSON.stringify(values)});
   await loadCompliance();
-  el("complianceMeta").textContent="Ownership and compliance contacts saved.";
+  el("complianceMeta").textContent="Contacts saved. "+complianceStatus("");
  }catch(e){el("complianceMeta").textContent="Could not save contacts: "+e.message}
  finally{b.disabled=false}
 }

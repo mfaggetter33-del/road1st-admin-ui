@@ -23,7 +23,9 @@ jobs:
               path=Path("/tmp/fleet-"+str(i)+".js")
               path.write_text(code)
               subprocess.run(["node","--check",str(path)],check=True)
-          assert '<option value="Recommended">Recommended</option>' in html
+          assert '<option value="Recommended">Recommended</option>' not in html
+          assert 'Choose Strict or Custom.' in html
+          assert '["Strict","Custom"].includes(current.blocking_preset)' in html
           assert '<option value="Strict">Strict</option>' in html
           assert '<option value="Custom">Custom</option>' in html
           assert 'set_fleet_custom_apps' in html

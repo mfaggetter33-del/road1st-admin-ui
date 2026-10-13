@@ -1836,7 +1836,7 @@ async function removeFleetFuelCard(cardId,name){
 }
 async function revokeFleetDevice(deviceId){
   var fleetId=document.getElementById("fleetSelect").value;
-  if(!await confirmRoad1st("Revoke this phone from the fleet?","","","Revoke"))return;
+  if(!await confirmRoad1st("Revoke phone access","","This revokes this phone only. The driver's account and past fleet reports remain intact. If replacing a phone, confirm the new phone is enrolled first.","Revoke phone"))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
       action:"revoke_device",fleet_id:fleetId,device_id:deviceId

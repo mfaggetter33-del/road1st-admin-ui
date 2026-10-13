@@ -1,0 +1,24 @@
+name: Verify ROAD 1ST Owner Summary Dropdowns
+on:
+  push:
+    branches:
+      - fix/owner-summary-dropdowns-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-summary-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify owner dropdown actions, access boundaries and JavaScript syntax
+        run: node checks/check_owner_summary_dropdowns.cjs
+      - name: Verify page still contains owner publishing and compliance controls
+        run: |
+          grep -q 'id="releasePublish"' owner.html
+          grep -q 'id="saveCompliance"' owner.html
+          grep -q 'id="companyDetail"' owner.html

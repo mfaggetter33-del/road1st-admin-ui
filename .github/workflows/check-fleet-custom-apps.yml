@@ -1,0 +1,43 @@
+name: Verify ROAD 1ST Custom Fleet Apps
+on:
+  push:
+    branches:
+      - feature/fleet-custom-policy-20261011
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Check JavaScript, Custom controls, and company privacy
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          html=Path("index.html").read_text()
+          for i,code in enumerate(re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S|re.I)):
+              path=Path("/tmp/fleet-"+str(i)+".js")
+              path.write_text(code)
+              subprocess.run(["node","--check",str(path)],check=True)
+          assert '<option value="Recommended">Recommended</option>' not in html
+          assert 'Choose Strict or Custom.' in html
+          assert '["Strict","Custom"].includes(current.blocking_preset)' in html
+          assert '<option value="Strict">Strict</option>' in html
+          assert '<option value="Custom">Custom</option>' in html
+          assert 'set_fleet_custom_apps' in html
+          assert 'fleetCustomCompanyId' in html
+          assert 'id="fleetCustomApps"' in html
+          assert 'fleetCustomMandatory' not in html
+          assert 'id="updateQrArea"' in html
+          print("Custom policy UI and syntax checked.")
+          PY
+      - name: Verify 32 language packs
+        run: |
+          node --check portal-translations.js
+          node --check portal-explanations.js
+          node --check portal-i18n.js
+          node check-portal-locales.cjs

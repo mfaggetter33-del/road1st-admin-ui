@@ -975,7 +975,7 @@ document.addEventListener("road1st-portal-language-change",function(){if(C==="re
 var journeysItems=[];
 function fillJourneysFleets(){
   var sel=document.getElementById("journeysFleet"),
-      current=sel.value||document.getElementById("fleetSelect").value;
+      current=document.getElementById("fleetSelect").value||sel.value;
   sel.textContent="";
   var fleets=fleetData&&fleetData.fleets||[];
   fleets.forEach(function(f){
@@ -1090,7 +1090,10 @@ async function openJourneyReport(item){
 }
 document.getElementById("journeysSearch").onclick=searchJourneys;
 document.getElementById("journeysGroup").onchange=renderJourneys;
-document.getElementById("journeysFleet").onchange=searchJourneys;
+document.getElementById("journeysFleet").onchange=function(){
+  document.getElementById("fleetSelect").value=this.value;
+  searchJourneys();
+};
 document.getElementById("journeysClear").onclick=function(){
   ["journeysRegistration","journeysDateFrom","journeysDateTo"].forEach(function(id){document.getElementById(id).value=""});
   document.getElementById("journeysMode").value="all";

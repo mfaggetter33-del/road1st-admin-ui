@@ -17,7 +17,7 @@ assert.match(html,/showDeviceUpdate\(null,"New phone"\)/);
 assert.match(html,/var response=await api\(F\+"\?kind=summary&fleet_id="\+encodeURIComponent\(fleetId\)\)/);
 assert.match(html,/if\(sequence!==fleetCounterRequest/);
 assert.match(html,/value=k==="fuel"\?"Fuel receipts":k==="defects"\?"Defect photos":"Reports"/);
-assert.match(html,/<option value="Reports">All fleet reports<\/option>/);
+assert.match(html,/<option value="Reports">Reports<\/option>/);
 assert.ok(!/async function counts\(\)\{await Promise\.all/.test(html),"not global API totals");
 assert.match(backend,/params\.get\("kind"\)==="summary"/);
 assert.match(backend,/if\(!\/\^\[0-9a-f-\]\{36\}\$\/i\.test\(requestedFleet\)\|\|!\(await canSeeFleet\(requestedFleet\)\)\)/);

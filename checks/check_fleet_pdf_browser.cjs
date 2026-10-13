@@ -40,7 +40,7 @@ for(const width of [390,1280]){
   button.onclick=()=>window.ROAD1ST_FLEET_PRINT.open(
    document.getElementById('viewerContent'),
    'Synthetic Journey','synthetic-report.jsonl','el','Synthetic Fleet A');
-  document.body.appendChild(button);
+  document.querySelector('.viewer-actions').appendChild(button);
  });
  const popupPromise=page.waitForEvent('popup',{timeout:20000});
  await page.click('#synthetic-print-test');

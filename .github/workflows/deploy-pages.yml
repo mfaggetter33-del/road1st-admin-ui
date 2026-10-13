@@ -37,10 +37,30 @@ jobs:
         with:
           enablement: true
 
+      - name: Assemble public portal only
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          for file in \
+            index.html owner.html apply.html \
+            road1st-logo.svg manifest.webmanifest owner.webmanifest \
+            portal-translations.js portal-explanations.js \
+            portal-report-translations.js portal-messages.js \
+            portal-event-locales.js portal-generated-report-locales.js \
+            portal-timeline-locales.js portal-i18n.js \
+            fleet-report-print.js; do
+            test -s "$file"
+            cp -- "$file" "_site/$file"
+          done
+          test "$(find _site -maxdepth 1 -type f | wc -l)" -eq 14
+          test ! -e _site/docs
+          test ! -e _site/backend
+          test ! -e _site/.github
+          echo "ROAD 1ST portal: 14 approved site assets only; no internal docs or source directories."
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Deploy Pages
         id: deployment

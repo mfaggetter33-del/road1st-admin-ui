@@ -73,7 +73,20 @@ const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="porta
 const fuelBrands = ["AS24","Allstar","Andamur","Aral","BP Plus","Circle K","DKV Mobility","E100","Eni","Esso Card","Eurowag","Keyfuels","Moeve","OMV","ORLEN","Q8","Radius","Shell Card","TotalEnergies","UK Fuels","UTA Edenred","VIALTIS"];
 for(const name of fuelBrands)
   assert.ok(html.includes('>'+name+'</option>'), "fuel-card brand must remain its untranslated provider name: "+name);
+// This button has its own verified 32-language dynamic dictionary. A static
+// coverage test should recognize it only after validating that dictionary.
+const printContext = {window:{}};
+vm.runInNewContext(fs.readFileSync("fleet-report-print.js", "utf8"),printContext,
+  {filename:"fleet-report-print.js"});
+const printTool = printContext.window.ROAD1ST_FLEET_PRINT;
+assert.ok(printTool && typeof printTool.label==="function","fleet print locale module available");
+assert.deepEqual([...printTool.languages].sort(),[...codes].sort(),
+  "print button translates for every selected manager language");
+for(const code of codes)assert.ok(printTool.label(code).trim(),
+  "missing fleet print translation: "+code);
+assert.ok(html.includes('id="viewerPrint"'),"print action exists in report viewer");
 const coverage = new Set(data.keys.concat(data.more.keys, data.report.keys, data.messages.keys, data.events.keys, data.generatedReports.keys, data.timeline.keys, [
+  printTool.label("en"),
   "ROAD 1ST ADMIN", "ROAD 1ST Server", "ROAD 1ST", "QR", ...fuelBrands
 ]));
 const missing = [...new Set(text)].filter(x => !coverage.has(x));

@@ -637,13 +637,38 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     </div>
   </div>
 </div>
+<div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
+<div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
+<div class="reviewlist" id="fleetUpdates">
+  <strong>Fleet updates</strong>
+  <div id="pilotReleaseMeta" class="note">No approved pilot APK yet.</div>
+   <div class="compliance-actions"><button type="button" id="fleetInstallApk" class="teal">Download QR</button></div>
+  <div class="note">Only the ROAD 1ST owner can publish a signed pilot APK.</div>
+  <div id="updateQrArea" class="hidden">
+    <strong id="updateQrHeading">Update QR</strong>
+    <div id="updateQrText" class="note"></div>
+    <div id="updateQrSvg" class="qrbox"></div>
+    <div class="note" style="text-align:center"><a id="updateDownloadLink" rel="noopener noreferrer" target="_blank"></a></div>
+    <div class="compliance-actions">
+      <button id="shareDriverUpdate" class="teal" type="button">Share</button>
+      <button id="copyDriverUpdate" class="secondary" type="button">Copy link</button>
+      <button id="downloadDriverUpdateQr" class="secondary" type="button">Download QR</button>
+      <button id="closeDriverUpdateQr" class="secondary" type="button">Close</button>
+    </div>
+    <div class="note">Driver must approve installation while parked.</div>
+  </div>
+</div>
+</section>
+<section id="fleetRecordsPanel" class="card hidden">
+  <h2 id="fleetRecordsTitle">Reports</h2>
+  <div class="fleetgrid"><div><label for="fleetRecordsFleet">Fleet</label><select id="fleetRecordsFleet"></select></div></div>
 <div class="reviewlist" id="fleetRecords">
   <strong>Fleet records</strong>
   <div class="fleetgrid">
     <div><label for="fleetRecordReg">Registration</label><input id="fleetRecordReg" maxlength="32" placeholder="131D11111"></div>
     <div><label for="fleetRecordFrom">From</label><input id="fleetRecordFrom" type="date"></div>
     <div><label for="fleetRecordTo">To</label><input id="fleetRecordTo" type="date"></div>
-    <div><label for="fleetRecordCategory">Category</label><select id="fleetRecordCategory">
+    <div class="hidden"><label for="fleetRecordCategory">Category</label><select id="fleetRecordCategory">
       <option value="all">All categories</option>
       <option value="Reports">Reports</option>
       <option value="Journeys">Journeys &amp; checkpoints</option>
@@ -666,27 +691,6 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   </div>
   <div id="fleetRecordCount" class="note" aria-live="polite"></div>
   <div class="table" style="overflow-x:auto"><table><thead id="fleetRecordHead"></thead><tbody id="fleetRecordBody"></tbody></table></div>
-</div>
-<div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
-<div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
-<div class="reviewlist" id="fleetUpdates">
-  <strong>Fleet updates</strong>
-  <div id="pilotReleaseMeta" class="note">No approved pilot APK yet.</div>
-   <div class="compliance-actions"><button type="button" id="fleetInstallApk" class="teal">Download QR</button></div>
-  <div class="note">Only the ROAD 1ST owner can publish a signed pilot APK.</div>
-  <div id="updateQrArea" class="hidden">
-    <strong id="updateQrHeading">Update QR</strong>
-    <div id="updateQrText" class="note"></div>
-    <div id="updateQrSvg" class="qrbox"></div>
-    <div class="note" style="text-align:center"><a id="updateDownloadLink" rel="noopener noreferrer" target="_blank"></a></div>
-    <div class="compliance-actions">
-      <button id="shareDriverUpdate" class="teal" type="button">Share</button>
-      <button id="copyDriverUpdate" class="secondary" type="button">Copy link</button>
-      <button id="downloadDriverUpdateQr" class="secondary" type="button">Download QR</button>
-      <button id="closeDriverUpdateQr" class="secondary" type="button">Close</button>
-    </div>
-    <div class="note">Driver must approve installation while parked.</div>
-  </div>
 </div>
 </section>
 </main>
@@ -1243,9 +1247,11 @@ function renderFleet(d){
     line.appendChild(name);line.appendChild(remove);fuelList.appendChild(line);
   });
   renderFleetVehicles();
-  fleetRecordItems=[];
-  document.getElementById("fleetRecordBody").textContent="";
-  document.getElementById("fleetRecordCount").textContent="";
+  if(!["reports","fuel","defects"].includes(C)){
+    fleetRecordItems=[];
+    document.getElementById("fleetRecordBody").textContent="";
+    document.getElementById("fleetRecordCount").textContent="";
+  }
   var drivers={};(d.drivers||[]).forEach(function(x){drivers[x.id]=x.display_name});
   var list=document.getElementById("deviceList"),devices=d.devices||[];
   list.textContent="";
@@ -1510,13 +1516,25 @@ async function removeFleetVehicle(id,registration){
     status.textContent=reportT("Vehicle removed. Existing records were not deleted.");
   }catch(e){status.textContent=e.message||"Could not remove vehicle."}
 }
-var fleetRecordItems=[];
+var fleetRecordItems=[],fleetRecordsSearchSequence=0;
+function fillFleetRecordsFleets(){
+  var sel=document.getElementById("fleetRecordsFleet"),
+      current=document.getElementById("fleetSelect").value||(fleetData&&fleetData.fleet&&fleetData.fleet.id)||sel.value;
+  sel.textContent="";
+  (fleetData&&fleetData.fleets||[]).forEach(function(f){
+    var option=document.createElement("option");
+    option.value=f.id;option.textContent=f.name;
+    if(f.id===current)option.selected=true;
+    sel.appendChild(option);
+  });
+  if(current&&Array.from(sel.options).some(function(option){return option.value===current}))sel.value=current;
+}
 function fleetReportParameters(){
   var params=new URLSearchParams(),reg=document.getElementById("fleetRecordReg").value.trim(),
       from=document.getElementById("fleetRecordFrom").value,to=document.getElementById("fleetRecordTo").value;
   if(from&&to&&from>to)throw Error(reportT("Start date must not be after end date."));
   params.set("kind","records");
-  params.set("fleet_id",document.getElementById("fleetSelect").value);
+  params.set("fleet_id",document.getElementById("fleetRecordsFleet").value);
   params.set("category",document.getElementById("fleetRecordCategory").value);
   if(reg)params.set("registration",reg);
   if(from)params.set("after",new Date(from+"T00:00:00").toISOString());
@@ -1524,17 +1542,25 @@ function fleetReportParameters(){
   return params.toString();
 }
 async function searchFleetRecords(){
-  var button=document.getElementById("fleetRecordSearch");
+  var button=document.getElementById("fleetRecordSearch"),sequence=++fleetRecordsSearchSequence,
+      fleetId=document.getElementById("fleetRecordsFleet").value;
   button.disabled=true;
+  fleetRecordItems=[];
+  document.getElementById("fleetRecordBody").textContent="";
   document.getElementById("fleetRecordCount").textContent=reportT("Searching…");
   try{
+    if(!fleetId)throw Error("Select a fleet.");
     var result=await api(F+"?"+fleetReportParameters());
-    fleetRecordItems=result.records||[];
+    if(sequence!==fleetRecordsSearchSequence||!["reports","fuel","defects"].includes(C)||
+       document.getElementById("fleetRecordsFleet").value!==fleetId)return;
+    if(result.fleet_id!==fleetId)throw Error("Fleet record response did not match the selected company.");
+    fleetRecordItems=(result.records||[]).map(function(item){return Object.assign({},item,{fleet_id:fleetId})});
     renderFleetRecordRows();
     document.getElementById("fleetRecordCount").textContent=fleetRecordItems.length+" "+reportT("records")+
       (result.limited?" · "+reportT("Search limited. Narrow the date range or registration."):"");
-  }catch(e){document.getElementById("fleetRecordCount").textContent=e.message||"Search failed."}
-  finally{button.disabled=false}
+  }catch(e){
+    if(sequence===fleetRecordsSearchSequence)document.getElementById("fleetRecordCount").textContent=e.message||"Search failed.";
+  }finally{if(sequence===fleetRecordsSearchSequence)button.disabled=false}
 }
 function renderFleetRecordRows(){
   var thead=document.getElementById("fleetRecordHead"),
@@ -1572,7 +1598,7 @@ function renderFleetRecordRows(){
 }
 async function fleetFileInfo(item){
   return await api(F,{method:"POST",body:JSON.stringify({
-    action:"fleet_file_url",fleet_id:document.getElementById("fleetSelect").value,
+    action:"fleet_file_url",fleet_id:item.fleet_id||document.getElementById("fleetSelect").value,
     record_id:item.id,record_kind:item.kind
   })});
 }
@@ -1587,7 +1613,7 @@ async function viewFleetReport(item){
   viewerLoading.classList.remove("hidden");
   try{
     var d=await api(F,{method:"POST",body:JSON.stringify({
-      action:"view_fleet_report",fleet_id:document.getElementById("fleetSelect").value,
+      action:"view_fleet_report",fleet_id:item.fleet_id||document.getElementById("fleetSelect").value,
       record_id:item.id,record_kind:"reports"
     })});
     showReport(d,item.id,true);
@@ -1676,13 +1702,93 @@ async function revokeFleetDevice(deviceId){
   }catch(e){status.textContent=e.message||"Could not revoke phone."}
 }
 function render(k,items){body.textContent="";if(k==="reports"){headers(["Received","App","File","Lines","Size","View","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.app_version);cell(tr,x.original_filename);cell(tr,x.content_line_count);cell(tr,bytes(x.size_bytes));viewBtn(tr,x.id,x.original_filename);dl(tr,"reports",x.id);body.appendChild(tr)})}else if(k==="fuel"){headers(["Received","Registration","Odometer","Litres",reportT("Fuel Card"),"Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.odometer);cell(tr,x.litres);cell(tr,x.fuel_card||"—");previewBtn(tr,"fuel",x.id,"Fuel receipt",(x.registration||"No registration")+" • "+date(x.created_at));dl(tr,"fuel",x.id);body.appendChild(tr)})}else{headers(["Received","Registration","Vehicle","Section","Defect","Preview","Download"]);items.forEach(function(x){var tr=document.createElement("tr");cell(tr,date(x.created_at));cell(tr,x.registration);cell(tr,x.vehicle_type);cell(tr,x.section);cell(tr,x.defect_label);previewBtn(tr,"defects",x.id,"Defect photo",(x.registration||"No registration")+" • "+(x.defect_label||"Defect")+" • "+date(x.created_at));dl(tr,"defects",x.id);body.appendChild(tr)})}}
+var navigationSequence=0;
+function hideDashboardViews(){
+  ["recordsTable","compliancePanel","fleetPanel","fleetRecordsPanel","customersPanel","journeysPanel","reportFilters"].forEach(function(id){
+    document.getElementById(id).classList.add("hidden");
+  });
+  document.querySelectorAll(".stat").forEach(function(button){
+    button.classList.remove("active");
+    button.setAttribute("aria-expanded","false");
+  });
+}
+function closeDashboardSection(){
+  ++navigationSequence;
+  ++fleetRecordsSearchSequence;
+  ++fleetLoadSequence;
+  C=null;
+  hideDashboardViews();
+  document.getElementById("title").textContent="ROAD 1ST";
+  status.textContent="";
+}
 async function load(k){
- if(["reports","fuel","defects"].includes(k)&&fleetData&&fleetData.fleet&&fleetData.fleet.id){
-  await load("fleet");
-  document.getElementById("fleetRecordCategory").value=k==="fuel"?"Fuel receipts":k==="defects"?"Defect photos":"Reports";
-  await searchFleetRecords();return;
- }
- C=k;status.textContent="Loading…";document.getElementById("reportFilters").classList.toggle("hidden",k!=="reports");document.querySelectorAll(".stat").forEach(function(x){x.classList.toggle("active",x.dataset.kind===k)});recordsTable.classList.add("hidden");compliancePanel.classList.add("hidden");fleetPanel.classList.add("hidden");document.getElementById("customersPanel").classList.add("hidden");document.getElementById("journeysPanel").classList.add("hidden");if(k==="customers"){document.getElementById("title").textContent=reportT("Fleet applications");document.getElementById("customersPanel").classList.remove("hidden");await loadApplications();return}if(k==="journeys"){document.getElementById("title").textContent=reportT("Journeys");document.getElementById("journeysPanel").classList.remove("hidden");if(!fleetData||!fleetData.fleets){fleetData=await api(F)}fillJourneysFleets();await searchJourneys();return}if(k==="fleet"){document.getElementById("title").textContent="Fleet enrolment";fleetPanel.classList.remove("hidden");await loadFleet(document.getElementById("fleetSelect").value||new URLSearchParams(location.search).get("fleet_id"));try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}status.textContent="Fleet phones and enrolment.";return}if(k==="compliance"){if(!platformAccess)throw Error("Owner access required.");document.getElementById("title").textContent="Ownership & compliance";compliancePanel.classList.remove("hidden");var cd=await api(A+"?kind=compliance");renderCompliance(cd);status.textContent="Secure owner and compliance record.";return}if(!platformAccess)throw Error("Fleet managers can use Fleet enrolment; platform records require owner/admin access.");recordsTable.classList.remove("hidden");document.getElementById("title").textContent=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";if(k==="reports"){var listing=await loadReportPages();reportItems=listing.items;reportTotal=listing.total;reportOpenGroups.clear();renderReportGroups();document.getElementById("reportsCount").textContent=reportTotal;status.textContent=reportT("Reports")+": "+reportItems.length+" / "+reportTotal+" · "+reportT("Category");return}var d=await api(A+"?kind="+k+"&limit=50");render(k,d.items||[]);document.getElementById(k+"Count").textContent=d.total;status.textContent=reportT(k==="fuel"?"Fuel receipts":"Defect photos")+": "+(d.items||[]).length+" / "+d.total}
+  var sequence=++navigationSequence;
+  C=k;
+  hideDashboardViews();
+  document.querySelectorAll(".stat").forEach(function(button){
+    var active=button.dataset.kind===k;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-expanded",active?"true":"false");
+  });
+  status.textContent="Loading…";
+  if(k==="customers"){
+    document.getElementById("title").textContent=reportT("Fleet applications");
+    document.getElementById("customersPanel").classList.remove("hidden");
+    await loadApplications();return;
+  }
+  if(k==="journeys"){
+    document.getElementById("title").textContent=reportT("Journeys");
+    document.getElementById("journeysPanel").classList.remove("hidden");
+    if(!fleetData||!fleetData.fleets){fleetData=await api(F)}
+    if(sequence!==navigationSequence)return;
+    fillJourneysFleets();
+    await searchJourneys();return;
+  }
+  if(k==="fleet"){
+    document.getElementById("title").textContent="Fleet enrolment";
+    fleetPanel.classList.remove("hidden");
+    await loadFleet(document.getElementById("fleetSelect").value||new URLSearchParams(location.search).get("fleet_id"));
+    if(sequence!==navigationSequence)return;
+    try{await refreshLatestPilot()}catch(e){document.getElementById("pilotReleaseMeta").textContent=e.message||"Update service unavailable."}
+    if(sequence!==navigationSequence)return;
+    status.textContent="Fleet phones and enrolment.";return;
+  }
+  if(k==="compliance"){
+    if(!platformAccess)throw Error("Owner access required.");
+    document.getElementById("title").textContent=reportT("Ownership & compliance");
+    compliancePanel.classList.remove("hidden");
+    var cd=await api(A+"?kind=compliance");
+    if(sequence!==navigationSequence)return;
+    renderCompliance(cd);status.textContent="Secure owner and compliance record.";return;
+  }
+  if(["reports","fuel","defects"].includes(k)){
+    if(!platformAccess)throw Error("Owner access required.");
+    var headings={reports:"Reports",fuel:"Fuel receipts",defects:"Defect photos"},
+        wanted=document.getElementById("fleetSelect").value||
+               document.getElementById("fleetRecordsFleet").value||
+               (fleetData&&fleetData.fleet&&fleetData.fleet.id)||"";
+    document.getElementById("title").textContent=reportT(headings[k]);
+    document.getElementById("fleetRecordsTitle").textContent=reportT(headings[k]);
+    document.getElementById("fleetRecordCategory").value=k==="reports"?"Reports":k==="fuel"?"Fuel receipts":"Defect photos";
+    document.getElementById("fleetRecordsPanel").classList.remove("hidden");
+    fleetRecordItems=[];
+    document.getElementById("fleetRecordBody").textContent="";
+    document.getElementById("fleetRecordCount").textContent="";
+    // Prepare fleet data only; do not open the Fleet Enrolment view.
+    if(!fleetData||!fleetData.fleet||!document.getElementById("fleetSelect").options.length||
+       (wanted&&fleetData.fleet.id!==wanted))await loadFleet(wanted);
+    if(sequence!==navigationSequence)return;
+    fillFleetRecordsFleets();
+    await searchFleetRecords();
+    if(sequence===navigationSequence)status.textContent=reportT(headings[k]);
+    return;
+  }
+  throw Error("Unknown dashboard section.");
+}
+function toggleDashboardSection(k){
+  if(C===k){closeDashboardSection();return}
+  load(k).catch(function(e){status.textContent=e.message||"Could not open section."});
+}
 async function counts(){if(fleetData&&fleetData.fleet)await updateSelectedFleetCounts(fleetData.fleet.id)}
 async function show(){if(new URLSearchParams(location.search).get("mode")==="fleet")C="fleet";login.classList.add("hidden");dash.classList.remove("hidden");try{await api(O,{method:"POST",body:JSON.stringify({action:"claim"})})}catch(e){}var hasFleet=false;try{fleetData=await api(F);hasFleet=true}catch(e){}try{await api(A+"?kind=reports&limit=1");platformAccess=true}catch(e){platformAccess=false}document.querySelectorAll(".platformOnly").forEach(function(x){x.classList.toggle("hidden",!platformAccess)});if(!platformAccess&&hasFleet)C="fleet";if(!platformAccess&&!hasFleet){clear();dash.classList.add("hidden");login.classList.remove("hidden");err.textContent="This account is not authorised for ROAD 1ST Admin or a fleet.";return}try{await load(C);if(platformAccess)await counts()}catch(e){status.textContent=e.message||"Could not load ROAD 1ST Admin."}}
 document.getElementById("saveCompliance").onclick=saveCompliance;
@@ -1819,6 +1925,19 @@ document.getElementById("fleetRecordClear").onclick=function(){
   document.getElementById("fleetRecordCategory").value="all";
   searchFleetRecords();
 };
+document.getElementById("fleetRecordsFleet").onchange=async function(){
+  var fleetId=this.value,sequence=++fleetRecordsSearchSequence;
+  fleetRecordItems=[];
+  document.getElementById("fleetRecordBody").textContent="";
+  document.getElementById("fleetRecordCount").textContent="";
+  if(!fleetId)return;
+  document.getElementById("fleetSelect").value=fleetId;
+  try{
+    await loadFleet(fleetId);
+    if(sequence!==fleetRecordsSearchSequence||!["reports","fuel","defects"].includes(C))return;
+    await searchFleetRecords();
+  }catch(e){if(sequence===fleetRecordsSearchSequence)status.textContent=e.message||"Could not load selected fleet."}
+};
 document.getElementById("fleetSelect").onchange=function(){
   var fleetId=this.value;
   resetVehicleEdit();
@@ -1853,7 +1972,20 @@ viewerPrint.onclick=function(){
 };
 document.addEventListener("road1st-portal-language-change",updateFleetPrintLabel);
 updateFleetPrintLabel();
-document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
+document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){
+  if(!C){counts().catch(function(){});return}
+  load(C).then(counts).catch(function(e){status.textContent=e.message||"Could not refresh."});
+};
+document.querySelectorAll(".stat").forEach(function(button){
+  button.setAttribute("role","button");
+  button.setAttribute("tabindex","0");
+  button.setAttribute("aria-expanded","false");
+  button.onclick=function(){toggleDashboardSection(button.dataset.kind)};
+  button.onkeydown=function(event){
+    if(event.key==="Enter"||event.key===" "){event.preventDefault();button.click()}
+  };
+});
+if(S)show();
 })();
 </script>
 </body>

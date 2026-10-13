@@ -1,4 +1,9 @@
 # ROAD 1ST — Fleet handover and retention policy (implementation specification)
+
+**13 OCTOBER 2026 STATUS UPDATE:** Offboarding, cloud retention schedule approvals, storage-object deletion and data-subject request handling are **not signed off as operational**. All six internal retention categories are still under review and historical unassigned test files await owner-approved, verified cleanup. See [current security/GDPR master checkpoint](https://github.com/mfaggetter33-del/driver-safety/blob/main/docs/ROAD1ST_SECURITY_GDPR_CHECKPOINT_2026-10-13.md).
+
+---
+
 Date: 2026-10-10
 Status: REVIEW / NOT YET PRODUCTION-READY
 

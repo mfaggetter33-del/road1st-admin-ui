@@ -1,4 +1,9 @@
 # ROAD 1ST — Private / Fleet Driver Privacy Notice
+
+**13 OCTOBER 2026 STATUS UPDATE:** **DRAFT ONLY — DO NOT PUBLISH AS VERIFIED CURRENT BEHAVIOUR.** The owner has since specified that starting a Fleet journey and safely capturing a Fleet fuel receipt should not require Start Shift; Android and server-side privacy changes are **pending**, as is a verified Private/Fleet boundary phone test. Legal identity, processor terms, retention, subprocessor and public URL verification remain outstanding. See the [private master checkpoint](https://github.com/mfaggetter33-del/driver-safety/blob/main/docs/ROAD1ST_SECURITY_GDPR_CHECKPOINT_2026-10-13.md).
+
+---
+
 **DRAFT FOR IRISH LEGAL AND TECHNICAL VERIFICATION — DO NOT PUBLISH AS A LIVE PROMISE**
 Prepared: 10 October 2026. Proposed effective version: pending approval.
 

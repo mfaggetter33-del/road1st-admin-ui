@@ -349,6 +349,15 @@ tr:last-child td{border-bottom:0}
   .viewer-summary{grid-template-columns:1fr 1fr}
   .viewer-grid{grid-template-columns:1fr}
   .timeline-item{grid-template-columns:1fr;gap:4px}
+  /* Manager phone: keep report actions readable without horizontal scrolling. */
+  .viewer-backdrop,.image-preview-backdrop{padding:8px}
+  .viewer,.image-preview-card{width:100%;max-width:100%;max-height:calc(100dvh - 16px);border-radius:14px}
+  .viewer-head,.image-preview-head{flex-direction:column;align-items:stretch;padding:12px}
+  .viewer-head h2,.image-preview-head h2{font-size:17px}
+  .viewer-actions,.image-preview-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .viewer-actions button,.image-preview-actions button{min-width:0;min-height:44px;white-space:normal;overflow-wrap:anywhere}
+  .viewer-body{padding:12px;overflow-wrap:anywhere}
+  .image-preview-body{min-height:140px}
 }
 
 /* Reports: grouped dates and categories; other portal sections unchanged. */
@@ -682,6 +691,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
       <div><h2 id="viewerTitle">ROAD 1ST Report</h2><div id="viewerFile" class="sub"></div></div>
       <div class="viewer-actions">
         <button id="viewerPdf">Download PDF report</button>
+        <button id="viewerPrint" type="button">Print / Save as PDF</button>
         <button id="viewerDownload" class="teal">Download original</button>
         <button id="viewerClose" class="secondary">Close</button>
       </div>
@@ -728,11 +738,12 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <script src="portal-generated-report-locales.js"></script>
 <script src="portal-timeline-locales.js"></script>
 <script src="portal-i18n.js"></script>
+<script src="fleet-report-print.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <script>
 (function(){"use strict";
-var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",A=P+"/functions/v1/road1st-admin-api",F=P+"/functions/v1/road1st-fleet-admin-api",O=P+"/functions/v1/road1st-fleet-onboarding",U=P+"/functions/v1/road1st-fleet-updates",S=null,C="reports",CURRENT_REPORT=null,CURRENT_REPORT_FILE="",createMode=false,platformAccess=true,fleetData=null,latestPilotRelease=null;
-var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),recordsTable=document.getElementById("recordsTable"),compliancePanel=document.getElementById("compliancePanel"),fleetPanel=document.getElementById("fleetPanel"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
+var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",A=P+"/functions/v1/road1st-admin-api",F=P+"/functions/v1/road1st-fleet-admin-api",O=P+"/functions/v1/road1st-fleet-onboarding",U=P+"/functions/v1/road1st-fleet-updates",S=null,C="reports",CURRENT_REPORT=null,CURRENT_REPORT_FILE="",CURRENT_REPORT_FLEET_NAME="",createMode=false,platformAccess=true,fleetData=null,latestPilotRelease=null;
+var login=document.getElementById("login"),dash=document.getElementById("dash"),err=document.getElementById("loginError"),status=document.getElementById("status"),head=document.getElementById("head"),body=document.getElementById("body"),recordsTable=document.getElementById("recordsTable"),compliancePanel=document.getElementById("compliancePanel"),fleetPanel=document.getElementById("fleetPanel"),viewer=document.getElementById("reportViewer"),viewerTitle=document.getElementById("viewerTitle"),viewerFile=document.getElementById("viewerFile"),viewerLoading=document.getElementById("viewerLoading"),viewerContent=document.getElementById("viewerContent"),viewerDownload=document.getElementById("viewerDownload"),viewerPdf=document.getElementById("viewerPdf"),viewerPrint=document.getElementById("viewerPrint"),imagePreview=document.getElementById("imagePreview"),imagePreviewTitle=document.getElementById("imagePreviewTitle"),imagePreviewMeta=document.getElementById("imagePreviewMeta"),imagePreviewBody=document.getElementById("imagePreviewBody"),imagePreviewDownload=document.getElementById("imagePreviewDownload");
 try{S=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
 function save(s){S=s;sessionStorage.setItem("r1a",JSON.stringify(s))}
 function clear(){S=null;sessionStorage.removeItem("r1a")}
@@ -819,8 +830,8 @@ function downloadPdfReport(){
 function addKpi(parent,label,value){var x=document.createElement("div"),b=document.createElement("b"),s=document.createElement("div");x.className="viewer-kpi";b.textContent=value;s.className="sub";s.textContent=label;x.appendChild(b);x.appendChild(s);parent.appendChild(x)}
 function addRow(parent,label,value){var x=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong");x.className="viewer-row";a.textContent=label;b.textContent=value==null||value===""?"—":String(value);x.appendChild(a);x.appendChild(b);parent.appendChild(x)}
 function section(title){var x=document.createElement("section"),h=document.createElement("h3");x.className="viewer-section";h.textContent=title;x.appendChild(h);viewerContent.appendChild(x);return x}
-function closeViewer(){viewer.classList.add("hidden");viewerContent.textContent="";viewerDownload.onclick=null;CURRENT_REPORT=null;CURRENT_REPORT_FILE=""}
-function showReport(d,id,isFleet){var r=d.report||{};CURRENT_REPORT=r;CURRENT_REPORT_FILE=d.filename||"";viewerContent.textContent="";viewerTitle.textContent=r.report_type==="setup_wizard"?"ROAD 1ST Setup Report":"ROAD 1ST Journey Report";viewerFile.textContent=d.filename||"";viewerDownload.onclick=function(){(isFleet?downloadFleetFile({id:id,kind:"reports"}):downloadFile("reports",id)).catch(function(e){status.textContent=e.message})};
+function closeViewer(){viewer.classList.add("hidden");viewerContent.textContent="";viewerDownload.onclick=null;CURRENT_REPORT=null;CURRENT_REPORT_FILE="";CURRENT_REPORT_FLEET_NAME=""}
+function showReport(d,id,isFleet){var r=d.report||{};CURRENT_REPORT=r;CURRENT_REPORT_FILE=d.filename||"";CURRENT_REPORT_FLEET_NAME=isFleet&&fleetData&&fleetData.fleet&&fleetData.fleet.name?String(fleetData.fleet.name):"";viewerContent.textContent="";viewerTitle.textContent=r.report_type==="setup_wizard"?"ROAD 1ST Setup Report":"ROAD 1ST Journey Report";viewerFile.textContent=d.filename||"";viewerDownload.onclick=function(){(isFleet?downloadFleetFile({id:id,kind:"reports"}):downloadFile("reports",id)).catch(function(e){status.textContent=e.message})};
 var sum=document.createElement("div");sum.className="viewer-summary";addKpi(sum,"Duration",duration(r.duration_seconds));addKpi(sum,"Maximum speed",r.max_speed_kmh==null?"—":r.max_speed_kmh+" km/h");addKpi(sum,"Driving Mode",r.driving_activations?("Activated "+r.driving_activations+"×"):"Not activated");addKpi(sum,"GPS usable",r.gps_samples?(r.usable_gps_samples+" / "+r.gps_samples):"—");viewerContent.appendChild(sum);
 var details=section("Journey summary"),grid=document.createElement("div");grid.className="viewer-grid";addRow(grid,"Started",date(r.start_utc));addRow(grid,"Finished",date(r.end_utc));addRow(grid,"App version",r.version);addRow(grid,"Vehicle",words(r.vehicle_type));addRow(grid,"Journey mode",r.journey_mode);addRow(grid,"Start mode",words(r.start_mode));addRow(grid,"End reason",words(r.end_reason));addRow(grid,"Automatic resumes",r.auto_resumes);addRow(grid,"Bluetooth connected events",r.bluetooth_connected_events);addRow(grid,"Bluetooth disconnected events",r.bluetooth_disconnected_events);addRow(grid,"Cloud checkpoints",r.checkpoints);addRow(grid,"Blocked apps",r.blocked_app_count);details.appendChild(grid);
 var controls=r.controls||{},keys=Object.keys(controls).filter(function(k){return k!=="auto_resume_on_movement"});if(keys.length){var cs=section("Stops, breaks and controls");keys.forEach(function(k){addRow(cs,controlName(k),controls[k]+" recorded")})}
@@ -1765,7 +1776,20 @@ document.getElementById("fleetSelect").onchange=function(){
 };
 document.getElementById("createBtn").onclick=createAccount;
 document.getElementById("modeBtn").onclick=toggleMode;
-viewerPdf.onclick=downloadPdfReport;document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
+viewerPdf.onclick=downloadPdfReport;
+function updateFleetPrintLabel(){
+  if(viewerPrint&&window.ROAD1ST_FLEET_PRINT)
+    viewerPrint.textContent=window.ROAD1ST_FLEET_PRINT.label(portalLocale());
+}
+viewerPrint.onclick=function(){
+  try{
+    if(!CURRENT_REPORT||viewer.classList.contains("hidden"))throw Error("Open a report first.");
+    window.ROAD1ST_FLEET_PRINT.open(viewerContent,viewerTitle.textContent,CURRENT_REPORT_FILE,portalLocale(),CURRENT_REPORT_FLEET_NAME);
+  }catch(e){status.textContent=e.message||"Could not open the print window.";}
+};
+document.addEventListener("road1st-portal-language-change",updateFleetPrintLabel);
+updateFleetPrintLabel();
+document.getElementById("imagePreviewClose").onclick=closeImagePreview;imagePreview.onclick=function(e){if(e.target===imagePreview)closeImagePreview()};viewerPdf.onclick=downloadPdfReport;document.getElementById("viewerClose").onclick=closeViewer;viewer.onclick=function(e){if(e.target===viewer)closeViewer()};document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!imagePreview.classList.contains("hidden"))closeImagePreview();else if(!viewer.classList.contains("hidden"))closeViewer()}});document.getElementById("loginBtn").onclick=signin;document.getElementById("password").addEventListener("keydown",function(e){if(e.key==="Enter")(createMode?createAccount():signin)()});document.getElementById("logout").onclick=function(){clear();location.reload()};document.getElementById("refresh").onclick=function(){load(C).then(counts).catch(function(){})};document.querySelectorAll(".stat").forEach(function(x){x.onclick=function(){load(x.dataset.kind).catch(function(e){status.textContent=e.message})}});if(S)show();
 })();
 </script>
 </body>

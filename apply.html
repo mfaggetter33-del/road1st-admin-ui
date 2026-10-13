@@ -10,6 +10,11 @@ label{display:block;color:var(--muted);font-size:13px;font-weight:700;margin:18p
 input{width:100%;padding:14px;border:1px solid var(--border);border-radius:12px;background:#0d131c;color:white;font-size:16px}input:focus{outline:2px solid var(--teal)}
 button{margin-top:20px;padding:14px 20px;width:100%;background:var(--purple);color:white;border:0;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer}button:disabled{opacity:.5}
 a{color:var(--teal)}.message{margin-top:15px;font-weight:600;min-height:26px}.hidden{display:none}.honeypot{position:absolute;left:-99999px}
+
+.road1st-footer{width:min(960px,94vw);margin:0 auto 22px;padding:18px 6px;border-top:1px solid #29374a;color:#a4b2c7;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;font-size:13px}
+.road1st-footer span:nth-child(2){text-align:center}
+.road1st-footer span:last-child{text-align:right}
+@media(max-width:680px){.road1st-footer{grid-template-columns:1fr;gap:7px;text-align:center}.road1st-footer span:last-child{text-align:center}}
 </style></head><body>
 <main><header><img src="road1st-logo.svg" alt="ROAD 1ST"><div><h1>Join ROAD 1ST Fleet</h1><small>Fleet safety, journey and vehicle records</small></div></header>
 <article><h2>Apply for fleet access</h2><p>Send your company details for review. A ROAD 1ST administrator must approve the application before a fleet portal becomes available. No payment is taken here.</p>
@@ -25,6 +30,7 @@ a{color:var(--teal)}.message{margin-top:15px;font-weight:600;min-height:26px}.hi
 <div class="message" id="result" role="status" aria-live="polite"></div>
 </form></article><p style="text-align:center"><a href="./">Fleet manager sign in</a></p>
 </main>
+<footer class="road1st-footer" aria-label="Website footer"><span>© ROAD 1ST</span><span>Terms and conditions apply</span><span>Fleet applications</span></footer>
 <script>
 (function(){"use strict";
   var form=document.getElementById("application"),button=document.getElementById("submit"),

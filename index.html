@@ -395,6 +395,12 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 #fleetFuelCardList .device strong{overflow-wrap:anywhere}
 #fleetFuelCardList .device button{flex-shrink:0}
 #fleetPanel,#compliancePanel{margin-top:12px}
+#fleetDeviceManager .device{grid-template-columns:1.3fr 1fr auto}
+#fleetDeviceManager .device.selected-phone{border-left:3px solid var(--teal);padding-left:10px;background:rgba(45,212,191,.055);border-radius:10px}
+#fleetDeviceManager .phone-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px;padding:10px;border-bottom:1px solid var(--border)}
+#fleetDeviceManager .phone-actions button{min-width:100px}
+#fleetDeviceManager .phone-actions .note{flex-basis:100%;margin:2px 0}
+@media(max-width:720px){#fleetDeviceManager .device{grid-template-columns:1fr}}
 @media(max-width:950px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:720px){.stats{grid-template-columns:1fr}.formgrid,.fleetgrid{grid-template-columns:1fr}.device{grid-template-columns:1fr}}
 
@@ -638,7 +644,19 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
   </div>
 </div>
 <div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
-<div class="reviewlist"><strong>Enrolled devices</strong><div id="deviceList" class="note">No devices enrolled.</div></div>
+<div class="reviewlist" id="fleetDeviceManager">
+  <strong>Enrolled devices</strong>
+  <div class="note">Select a phone to see its controls. Revoke removes phone access, not the driver's records.</div>
+  <div id="deviceList" class="note">No devices enrolled.</div>
+  <div id="deviceQrArea" class="hidden">
+    <strong id="deviceQrHeading">Phone enrolment</strong>
+    <div id="deviceQrMeta" class="note"></div>
+    <div id="deviceQrSvg" class="qrbox"></div>
+    <div class="compliance-actions" style="justify-content:flex-end">
+      <button type="button" class="secondary" id="closeDeviceQr">Close QR</button>
+    </div>
+  </div>
+</div>
 <div class="reviewlist" id="fleetUpdates">
   <strong>Fleet updates</strong>
   <div id="pilotReleaseMeta" class="note">No approved pilot APK yet.</div>
@@ -1212,6 +1230,45 @@ async function updateSelectedFleetCounts(fleetId){
   status.textContent="Fleet counts unavailable: "+(e.message||"Could not load");
  }
 }
+var selectedFleetDeviceId=null;
+function closeDevicePhoneQr(){
+  document.getElementById("deviceQrArea").classList.add("hidden");
+  document.getElementById("deviceQrHeading").textContent="Phone enrolment";
+  document.getElementById("deviceQrMeta").textContent="";
+  document.getElementById("deviceQrSvg").textContent="";
+}
+async function createExistingDriverPhoneQr(device,mode,button){
+  var current=fleetData&&fleetData.fleet,
+      fleetId=current&&current.id,
+      active=(fleetData&&fleetData.devices||[]).find(function(x){return x.id===device.id&&!x.revoked_at});
+  if(!fleetId||fleetId!==document.getElementById("fleetSelect").value||
+     !active||selectedFleetDeviceId!==device.id){status.textContent="Select an active phone first.";return}
+  var driver=(fleetData.drivers||[]).find(function(x){return x.id===device.driver_id&&x.active});
+  if(!driver){status.textContent="Driver is inactive or cannot be found.";return}
+  button.disabled=true;
+  status.textContent=mode==="replace"?"Preparing replacement phone QR…":"Preparing additional phone QR…";
+  try{
+    var d=await api(F,{method:"POST",body:JSON.stringify({
+      action:"create_enrolment",fleet_id:fleetId,driver_id:driver.id
+    })});
+    if(!d||!d.driver||d.driver.id!==driver.id||typeof d.qr_svg!=="string"||
+       !d.qr_svg.includes("<svg"))throw Error("The new phone QR was not confirmed for this driver.");
+    if(!fleetData||!fleetData.fleet||fleetData.fleet.id!==fleetId||
+       document.getElementById("fleetSelect").value!==fleetId||selectedFleetDeviceId!==device.id)return;
+    var area=document.getElementById("deviceQrArea");
+    document.getElementById("deviceQrHeading").textContent=(mode==="replace"?"Update phone":"Add phone")+" · "+driver.display_name;
+    document.getElementById("deviceQrMeta").textContent=
+      "Scan this QR with the NEW phone for "+driver.display_name+
+      ". Expires "+date(d.expires_at)+". Single use. "+
+      (mode==="replace"?"The old phone stays active until you verify the new phone in Enrolled devices, then select and revoke the old phone. All historical records remain stored.":
+       "This adds another phone for the same driver. The existing phone remains active. Historical records are unchanged.");
+    document.getElementById("deviceQrSvg").innerHTML=d.qr_svg;
+    area.classList.remove("hidden");
+    area.scrollIntoView({behavior:"smooth",block:"nearest"});
+    status.textContent="One-use QR ready for "+driver.display_name+".";
+  }catch(e){status.textContent=e.message||"Could not create phone QR."}
+  finally{button.disabled=false}
+}
 function renderFleet(d){
   fleetData=d||{};
   var fleets=d.fleets||[],sel=document.getElementById("fleetSelect"),current=d.fleet||null;
@@ -1259,41 +1316,83 @@ function renderFleet(d){
   var list=document.getElementById("deviceList"),devices=d.devices||[];
   list.textContent="";
   if(!devices.length)list.textContent="No devices enrolled.";
+  if(!devices.some(function(x){return x.id===selectedFleetDeviceId}))selectedFleetDeviceId=null;
   devices.forEach(function(x){
+    var label=drivers[x.driver_id]||"Driver";
     var row=document.createElement("div");row.className="device";
-    var who=document.createElement("div");who.textContent=drivers[x.driver_id]||"Driver";
-    var dev=document.createElement("div");dev.textContent=x.device_model||"Phone";
+    var chosen=selectedFleetDeviceId===x.id;
+    if(chosen)row.classList.add("selected-phone");
+    var who=document.createElement("strong");who.textContent=label;
+    var meta=document.createElement("div");meta.className="sub";
+    meta.textContent=(x.device_model||"Phone")+" · "+reportT("Version name")+": "+(x.app_version||"—");
+    if(x.revoked_at)meta.textContent+=" · "+reportT("Revoked");
+    else if(latestPilotRelease&&x.app_version)
+      meta.textContent+=" · "+reportT(x.app_version===latestPilotRelease.version_name?"Up to date":"Update available");
+    var action=document.createElement("button");action.className=chosen?"teal":"secondary";
+    action.type="button";
+    action.textContent=chosen?"Close phone":"Select phone";
+    action.setAttribute("aria-expanded",chosen?"true":"false");
+    action.onclick=function(){
+      selectedFleetDeviceId=selectedFleetDeviceId===x.id?null:x.id;
+      closeDevicePhoneQr();
+      renderFleet(d);
+    };
     var seen=document.createElement("div");seen.className="sub";
-    seen.textContent=x.revoked_at?reportT("Revoked"):"Last seen "+date(x.last_seen_at);
-    var version=document.createElement("div");version.className="sub";
-    version.textContent=reportT("Version name")+": "+(x.app_version||"—");
-    var action=document.createElement("div");
-    if(!x.revoked_at){
-      var update=document.createElement("button");update.className="secondary";
-      update.textContent=reportT("Update App");update.type="button";
-      update.onclick=function(){showDeviceUpdate(x,drivers[x.driver_id]||"Driver")};
-      action.appendChild(update);
-      if(latestPilotRelease&&x.app_version){
-        var badge=document.createElement("div");badge.className="sub";
-        badge.textContent=reportT(x.app_version===latestPilotRelease.version_name?"Up to date":"Update available");
-        version.appendChild(document.createTextNode(" · "));version.appendChild(badge);
+    seen.textContent=x.revoked_at?"Revoked "+date(x.revoked_at):"Last seen "+date(x.last_seen_at);
+    var info=document.createElement("div");info.appendChild(who);info.appendChild(seen);
+    row.appendChild(info);row.appendChild(meta);row.appendChild(action);list.appendChild(row);
+    if(chosen){
+      var actions=document.createElement("div");actions.className="phone-actions";
+      var labelLine=document.createElement("div");labelLine.className="note";
+      labelLine.textContent=label+" · "+(x.device_model||"Phone");
+      actions.appendChild(labelLine);
+      if(!x.revoked_at){
+        var update=document.createElement("button");update.className="secondary";update.type="button";
+        update.textContent="Update App";
+        update.onclick=function(){showDeviceUpdate(x,label)};
+        actions.appendChild(update);
+        var add=document.createElement("button");add.className="secondary";add.type="button";
+        add.textContent="Add phone";
+        add.onclick=function(){createExistingDriverPhoneQr(x,"add",add)};
+        actions.appendChild(add);
+        var replacePhone=document.createElement("button");replacePhone.className="teal";replacePhone.type="button";
+        replacePhone.textContent="Update phone";
+        replacePhone.onclick=function(){createExistingDriverPhoneQr(x,"replace",replacePhone)};
+        actions.appendChild(replacePhone);
+        var revoke=document.createElement("button");revoke.className="secondary";revoke.type="button";
+        revoke.textContent="Revoke phone";
+        revoke.onclick=function(){revokeFleetDevice(x.id)};
+        actions.appendChild(revoke);
+        var instruction=document.createElement("div");instruction.className="note";
+        instruction.textContent="Update App installs a newer ROAD 1ST version on this phone. Update phone gives a replacement phone a new one-use QR under the same driver; revoke the old phone only after the new phone appears.";
+        actions.appendChild(instruction);
+      }else{
+        var note=document.createElement("div");note.className="note";
+        note.textContent="This phone was revoked. Historical driver records remain available under the fleet.";
+        actions.appendChild(note);
       }
-      var revoke=document.createElement("button");revoke.className="secondary";revoke.type="button";
-      revoke.textContent=reportT("Revoke");revoke.onclick=function(){revokeFleetDevice(x.id)};
-      action.appendChild(revoke);
+      list.appendChild(actions);
     }
-    row.appendChild(who);row.appendChild(dev);row.appendChild(version);row.appendChild(seen);
-    row.appendChild(action);list.appendChild(row);
   });
   var alerts=document.getElementById("fleetAlerts"),events=d.events||[];
   alerts.textContent="";
   if(!events.length)alerts.textContent="No recent alerts.";
   else events.forEach(function(e){
     var x=document.createElement("div");x.className="reviewitem";
-    var b=document.createElement("b");b.textContent=(drivers[e.driver_id]||"Driver")+" · "+reportT("PIN reset");
-    var t=document.createElement("div");t.textContent=reportT("Self-service identity check")+": "+String(e.verification_method||"device security").replace(/_/g," ");
+    var labels={
+      fleet_invitation_accepted:"Fleet invitation accepted",
+      pin_reset_self_service:"PIN reset"
+    };
+    var eventTitle=labels[e.event_type]||words(e.event_type||"Fleet activity");
+    var b=document.createElement("b");b.textContent=(drivers[e.driver_id]||"Driver")+" · "+reportT(eventTitle);
+    var t=document.createElement("div");t.className="sub";
+    if(e.event_type==="pin_reset_self_service")
+      t.textContent=reportT("Self-service identity check")+": "+String(e.verification_method||"device security").replace(/_/g," ");
+    else if(e.event_type==="fleet_invitation_accepted")
+      t.textContent="Invitation accepted on the driver's phone.";
+    else t.textContent=String(e.verification_method||"").replace(/_/g," ");
     var m=document.createElement("div");m.className="sub";m.textContent=date(e.client_created_at||e.created_at);
-    x.appendChild(b);x.appendChild(t);x.appendChild(m);alerts.appendChild(x);
+    x.appendChild(b);if(t.textContent)x.appendChild(t);x.appendChild(m);alerts.appendChild(x);
   });
 }
 function showDeviceUpdate(device,driver){
@@ -1845,6 +1944,7 @@ document.getElementById("closeDriverUpdateQr").onclick=function(){
   document.getElementById("updateQrArea").classList.add("hidden");
 };
 document.getElementById("createEnrolment").onclick=createFleetEnrolment;
+document.getElementById("closeDeviceQr").onclick=closeDevicePhoneQr;
 document.getElementById("saveWalkaroundRequirement").onclick=saveWalkaroundRequirement;
 document.getElementById("closeEnrolmentQr").onclick=function(){document.getElementById("qrArea").classList.add("hidden");document.getElementById("qrSvg").textContent="";document.getElementById("qrMeta").textContent="";};
 
@@ -1985,6 +2085,8 @@ document.getElementById("fleetRecordsFleet").onchange=async function(){
 };
 document.getElementById("fleetSelect").onchange=function(){
   var fleetId=this.value;
+  selectedFleetDeviceId=null;
+  closeDevicePhoneQr();
   resetVehicleEdit();
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("updateQrArea").classList.add("hidden");

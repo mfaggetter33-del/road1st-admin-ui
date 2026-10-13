@@ -1,4 +1,9 @@
 # ROAD 1ST — Separate Private and Fleet Android apps
+
+**13 OCTOBER 2026 SUPERSEDED PRODUCT DIRECTION:** This is a historical **two-installation proposal**, NOT the current approved shipped design. The current ROAD 1ST 2.99.25 pilot is **one Android app with distinct Private and Fleet modes**. Product-level SOS/EOS and fuel/journey changes are under review; do not infer that the separate-app proposal was built. See [current security/GDPR master checkpoint](https://github.com/mfaggetter33-del/driver-safety/blob/main/docs/ROAD1ST_SECURITY_GDPR_CHECKPOINT_2026-10-13.md).
+
+---
+
 Status: approved product direction from discussion 10 October 2026; IMPLEMENTATION NOT COMPLETE.
 
 ## Product boundary

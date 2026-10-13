@@ -65,7 +65,13 @@ assert.ok(html.includes('A=P+"/functions/v1/road1st-admin-api"'), "original repo
 const inlineScript=html.split("<script>")[1]?.split("</script>")[0] ?? "";
 assert.ok(inlineScript.trim(), "portal inline script exists");
 new vm.Script(inlineScript, { filename: "ROAD1ST Admin inline script" });
+// The approved brand/legal footer is deliberately fixed wording, not a manager-control label.
+// Validate it separately so the 32-language coverage check remains strict for portal controls.
+const legalFooter = html.match(/<footer class="road1st-footer"[\s\S]*?<\/footer>/);
+assert.ok(legalFooter && legalFooter[0].includes("© ROAD 1ST") &&
+  legalFooter[0].includes("Terms and conditions apply"), "approved copyright/terms footer required");
 const text = html.slice(html.indexOf("<body>"), html.indexOf('<script src="portal-translations.js"'))
+  .replace(/<footer class="road1st-footer"[\s\S]*?<\/footer>/, "")
   .replace(/<img[^>]*>/g, "")
   .replace(/<[^>]+>/g, "|")
   .replace(/&amp;/g, "&")

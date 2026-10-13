@@ -52,11 +52,11 @@ jobs:
             test -s "$file"
             cp -- "$file" "_site/$file"
           done
-          test "$(find _site -maxdepth 1 -type f | wc -l)" -eq 14
+          test "$(find _site -maxdepth 1 -type f | wc -l)" -eq 15
           test ! -e _site/docs
           test ! -e _site/backend
           test ! -e _site/.github
-          echo "ROAD 1ST portal: 14 approved site assets only; no internal docs or source directories."
+          echo "ROAD 1ST portal: 15 approved site assets only; no internal docs or source directories."
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

@@ -1360,7 +1360,49 @@ async function loadFleet(fleetId){
   return d;
 }
 async function createFleetEnrolment(){var name=document.getElementById("newDriverName").value.trim(),fleetId=document.getElementById("fleetSelect").value,b=document.getElementById("createEnrolment");if(!name){status.textContent="Enter the driver name.";return}b.disabled=true;status.textContent="Creating one-time enrolment QR…";try{var d=await api(F,{method:"POST",body:JSON.stringify({action:"create_enrolment",fleet_id:fleetId,driver_name:name})});var area=document.getElementById("qrArea"),svg=document.getElementById("qrSvg");if(typeof d.qr_svg!=="string"||d.qr_svg.indexOf("<svg")<0)throw Error("QR could not be generated.");svg.innerHTML=d.qr_svg;document.getElementById("qrMeta").textContent=(d.driver&&d.driver.display_name?d.driver.display_name:"Driver")+" · expires "+date(d.expires_at)+" · single use";area.classList.remove("hidden");document.getElementById("newDriverName").value="";status.textContent="QR ready. Scan it with the phone being enrolled.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not create enrolment."}finally{b.disabled=false}}
-async function saveFleetPolicy(){var fleetId=document.getElementById("fleetSelect").value,preset=document.getElementById("fleetPreset").value,b=document.getElementById("saveFleetPreset");b.disabled=true;try{await api(F,{method:"POST",body:JSON.stringify({action:"set_fleet_preset",fleet_id:fleetId,blocking_preset:preset})});status.textContent="Fleet policy saved. Enrolled phones pick it up automatically.";await loadFleet(fleetId)}catch(e){status.textContent=e.message||"Could not save fleet policy."}finally{b.disabled=false}}
+var fleetPolicySaveBusy=false;
+async function saveFleetPolicy(){
+  if(fleetPolicySaveBusy)return;
+  var fleetSelect=document.getElementById("fleetSelect"),
+      presetSelect=document.getElementById("fleetPreset"),
+      button=document.getElementById("saveFleetPreset"),
+      fleetId=fleetSelect.value,
+      preset=presetSelect.value,
+      current=fleetData&&fleetData.fleet&&fleetData.fleet.id===fleetId?fleetData.fleet:null,
+      previous=current&&current.blocking_preset||"Recommended",
+      companyName=current&&current.name||"selected fleet";
+  if(!current||!fleetId){
+    status.textContent="Fleet not loaded. Please select the fleet again.";
+    return;
+  }
+  fleetPolicySaveBusy=true;
+  // The company cannot be switched while its policy is being saved.
+  button.disabled=true;fleetSelect.disabled=true;presetSelect.disabled=true;
+  status.textContent="Saving "+preset+" policy for "+companyName+"…";
+  try{
+    var saved=await api(F,{method:"POST",body:JSON.stringify({
+      action:"set_fleet_preset",fleet_id:fleetId,blocking_preset:preset
+    })});
+    if(!saved||!saved.fleet||saved.fleet.id!==fleetId||saved.fleet.blocking_preset!==preset)
+      throw Error("The server did not confirm this fleet policy.");
+    // Only the targeted fleet gets the new policy, never a different company.
+    current.blocking_preset=preset;
+    await loadFleet(fleetId);
+    if(!fleetData||!fleetData.fleet||fleetData.fleet.id!==fleetId||
+       fleetData.fleet.blocking_preset!==preset)
+      throw Error("Policy saved, but the confirmation could not be refreshed.");
+    status.textContent="Saved "+preset+" for "+companyName+". Other fleets unchanged.";
+  }catch(e){
+    if(fleetSelect.value===fleetId){
+      // A failed save must not leave an unsaved value looking successful.
+      presetSelect.value=previous;
+    }
+    status.textContent=e.message||"Could not save fleet policy.";
+  }finally{
+    button.disabled=false;fleetSelect.disabled=false;presetSelect.disabled=false;
+    fleetPolicySaveBusy=false;
+  }
+}
 async function saveWalkaroundRequirement(){
   var fleetId=document.getElementById("fleetSelect").value,
       required=document.getElementById("fleetWalkaroundRequired").value==="true",
@@ -1914,6 +1956,8 @@ document.getElementById("closeEnrolmentQr").onclick=function(){document.getEleme
   };
 })();
 document.getElementById("saveFleetPreset").onclick=saveFleetPolicy;
+// Save a fleet policy immediately when changed; the button remains a manual retry.
+document.getElementById("fleetPreset").onchange=saveFleetPolicy;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
 document.getElementById("fleetFuelCardProvider").onchange=fuelCardProviderSelectionChanged;
 document.getElementById("addFleetVehicle").onclick=addFleetVehicle;

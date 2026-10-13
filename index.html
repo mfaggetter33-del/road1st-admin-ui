@@ -646,14 +646,14 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <div class="reviewlist"><strong>Recent fleet alerts</strong><div id="fleetAlerts" class="note">No recent alerts.</div></div>
 <div class="reviewlist" id="fleetDeviceManager">
   <strong>Enrolled devices</strong>
-  <div class="note">Select a phone to see its controls. Revoke removes phone access, not the driver's records.</div>
+  
   <div id="deviceList" class="note">No devices enrolled.</div>
   <div id="deviceQrArea" class="hidden">
-    <strong id="deviceQrHeading">Phone enrolment</strong>
+    <strong id="deviceQrHeading">Fleet enrolment</strong>
     <div id="deviceQrMeta" class="note"></div>
     <div id="deviceQrSvg" class="qrbox"></div>
     <div class="compliance-actions" style="justify-content:flex-end">
-      <button type="button" class="secondary" id="closeDeviceQr">Close QR</button>
+      <button type="button" class="secondary" id="closeDeviceQr">Close</button>
     </div>
   </div>
 </div>
@@ -1233,7 +1233,7 @@ async function updateSelectedFleetCounts(fleetId){
 var selectedFleetDeviceId=null;
 function closeDevicePhoneQr(){
   document.getElementById("deviceQrArea").classList.add("hidden");
-  document.getElementById("deviceQrHeading").textContent="Phone enrolment";
+  document.getElementById("deviceQrHeading").textContent=reportT("Fleet enrolment");
   document.getElementById("deviceQrMeta").textContent="";
   document.getElementById("deviceQrSvg").textContent="";
 }
@@ -1836,7 +1836,7 @@ async function removeFleetFuelCard(cardId,name){
 }
 async function revokeFleetDevice(deviceId){
   var fleetId=document.getElementById("fleetSelect").value;
-  if(!await confirmRoad1st("Revoke phone access","","This revokes this phone only. The driver's account and past fleet reports remain intact. If replacing a phone, confirm the new phone is enrolled first.","Revoke phone"))return;
+  if(!await confirmRoad1st("Revoke this phone from the fleet?","","This revokes this phone only. The driver's account and past fleet reports remain intact. If replacing a phone, confirm the new phone is enrolled first.","Revoke"))return;
   try{
     await api(F,{method:"POST",body:JSON.stringify({
       action:"revoke_device",fleet_id:fleetId,device_id:deviceId

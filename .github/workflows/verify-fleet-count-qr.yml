@@ -1,0 +1,26 @@
+name: Verify Fleet Count & APK QR Hotfix
+on:
+  push:
+    branches: [fix/fleet-count-apk-safe-20261013]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify scoped fleet dashboard, APK QR, JS
+        run: node checks/check_fleet_count_qr.cjs
+      - name: Verify all 32 portal languages
+        run: node check-portal-locales.cjs
+      - name: Verify PDF print unaffected
+        run: node checks/test_fleet_print.cjs
+      - name: Check live fleet summary rejects unauthenticated requests
+        run: |
+          code=$(curl -fsS -o /dev/null -w '%{http_code}' 'https://ghyeurbeqwjfyzdwcepn.supabase.co/functions/v1/road1st-fleet-admin-api?kind=summary&fleet_id=00000000-0000-0000-0000-000000000000' || true)
+          test "$code" = '401'

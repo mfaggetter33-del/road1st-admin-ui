@@ -11,7 +11,7 @@ assert.match(html,/function updateSelectedFleetCounts\(fleetId\)/);
 assert.match(html,/\?kind=summary&fleet_id=/);
 assert.match(html,/fleetCounterRequest/);
 assert.match(html,/value=k==="fuel"\?"Fuel receipts":k==="defects"\?"Defect photos":"Reports"/);
-assert.ok(!html.includes('document.getElementById(k+"Count").textContent=d.total'),"must not use global total");
+assert.match(html,/async function counts\(\)\{if\(fleetData&&fleetData\.fleet\)await updateSelectedFleetCounts\(fleetData\.fleet\.id\)\}/);
 assert.match(html,/if\(\["reports","fuel","defects"\]\.includes\(k\)&&fleetData/);
 assert.match(html,/await searchFleetRecords\(\);return;/);
 assert.match(html,/value="Recommended">Recommended<\/option><option value="Strict">Strict<\/option>/);

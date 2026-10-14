@@ -554,7 +554,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 <h2>Fleet enrolment</h2>
 <div class="sub">Register ROAD 1ST phones to a fleet with a 30-minute, single-use QR code. The QR does not contain an admin password or permanent company secret.</div>
 <div class="fleetgrid">
-<div><label>Fleet</label><select id="fleetSelect"></select></div>
+<div><label>Fleet</label><select id="fleetSelect"></select></div><div><label>Customer data handover</label><a href="handover.html" id="fleetHandoverLink" class="secondary" style="display:inline-block;padding:12px 15px;border:1px solid #6a527d;border-radius:9px;color:#f5e7ff;text-decoration:none">Handover &amp; Close Account ↗</a></div>
 <div><label>Fleet app-blocking policy</label><select id="fleetPreset"><option value="Recommended">Recommended</option><option value="Strict">Strict</option></select></div>
 </div>
 <div class="compliance-actions"><button id="saveFleetPreset" class="secondary">Save fleet policy</button></div>
@@ -2131,6 +2131,12 @@ document.querySelectorAll(".stat").forEach(function(button){
   button.onkeydown=function(event){
     if(event.key==="Enter"||event.key===" "){event.preventDefault();button.click()}
   };
+});
+var hl=document.getElementById("fleetHandoverLink");
+if(hl)hl.addEventListener("click",function(e){
+ var selected=document.getElementById("fleetSelect");
+ if(!selected||!selected.value){e.preventDefault();status.textContent="Choose a fleet before opening the handover page.";return}
+ hl.href="handover.html?fleet_id="+encodeURIComponent(selected.value);
 });
 if(S)show();
 })();

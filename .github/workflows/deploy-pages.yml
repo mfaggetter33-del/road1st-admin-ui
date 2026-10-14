@@ -32,6 +32,7 @@ jobs:
           node --check portal-i18n.js
           node check-portal-locales.cjs
           node checks/check_dashboard_navigation.cjs
+          node checks/check_handover_workflow.cjs
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -43,7 +44,7 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           for file in \
-            index.html owner.html apply.html \
+            index.html owner.html apply.html handover.html \
             road1st-logo.svg manifest.webmanifest owner.webmanifest \
             portal-translations.js portal-explanations.js \
             portal-report-translations.js portal-messages.js \
@@ -53,11 +54,11 @@ jobs:
             test -s "$file"
             cp -- "$file" "_site/$file"
           done
-          test "$(find _site -maxdepth 1 -type f | wc -l)" -eq 15
+          test "$(find _site -maxdepth 1 -type f | wc -l)" -eq 16
           test ! -e _site/docs
           test ! -e _site/backend
           test ! -e _site/.github
-          echo "ROAD 1ST portal: 15 approved site assets only; no internal docs or source directories."
+          echo "ROAD 1ST portal: 16 approved site assets only; no internal docs or source directories."
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

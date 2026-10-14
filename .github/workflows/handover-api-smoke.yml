@@ -1,0 +1,39 @@
+name: ROAD 1ST handover access smoke test
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/handover-api-smoke.yml'
+      - 'backend/road1st-fleet-handover/**'
+      - 'handover.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deny unauthenticated handover access and deletion
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://ghyeurbeqwjfyzdwcepn.supabase.co/functions/v1/road1st-fleet-handover-api"
+          code=$(curl -sS --max-time 20 --output /tmp/response.json --write-out '%{http_code}' \
+            "$API?action=status&fleet_id=65f5d906-8598-45a1-973f-a318284662d3")
+          test "$code" = 401 || test "$code" = 403
+          echo "Anonymous status denied: HTTP $code"
+          code=$(curl -sS --max-time 20 --output /tmp/deletion.json --write-out '%{http_code}' \
+            -X POST "$API" -H 'Content-Type: application/json' \
+            -d '{"action":"complete_close","fleet_id":"65f5d906-8598-45a1-973f-a318284662d3","confirmation":"DELETE kerry sandblasted art"}')
+          test "$code" = 401 || test "$code" = 403
+          echo "Anonymous permanent-delete attempt denied: HTTP $code"
+      - name: Handover page is available from deployed portal
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://mfaggetter33-del.github.io/road1st-admin-ui/handover.html"
+          curl -fsSL --max-time 30 --retry 2 "$URL" -o /tmp/road1st-handover.html
+          grep -q 'id="ackCheck"' /tmp/road1st-handover.html
+          grep -q 'id="complete"' /tmp/road1st-handover.html
+          echo "Deployed owner/customer handover page reachable."

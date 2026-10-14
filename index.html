@@ -1585,7 +1585,7 @@ function renderFleetCustomApps(){
 async function addFleetCustomApp(){
   var input=document.getElementById("fleetCustomPackage"),pkg=input.value.trim(),
       notice=document.getElementById("fleetCustomAppStatus");
-  if(!/^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg) ||
+  if(!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg) ||
      pkg.length>140||isProtectedFleetPackage(pkg)){
     notice.textContent="Enter a valid Android app package. ROAD 1ST and emergency calling cannot be changed.";return;
   }

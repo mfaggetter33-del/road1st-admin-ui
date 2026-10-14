@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>ROAD 1ST · Fleet Handover &amp; Close Account</title>
+<style>
+:root{color-scheme:dark;--bg:#0a101b;--panel:#131d2d;--border:#34445c;--text:#f5f7fd;--mute:#b4bfd1;--purple:#8c5afa;--teal:#19c1b5;--red:#ff9a9a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.52 system-ui,Segoe UI,Arial,sans-serif}
+header{border-bottom:1px solid var(--border);background:#0e1624}header .wrap{display:flex;align-items:center;gap:16px;padding:18px 0}
+.wrap{width:min(980px,calc(100% - 32px));margin:auto}header img{width:62px;height:62px;object-fit:contain}
+h1{font-size:1.48rem;margin:0}h2{font-size:1.11rem;margin:0 0 9px}p{margin:8px 0 14px}.muted,.small{color:var(--mute)}.small{font-size:.87rem}
+main{padding:24px 0 45px}.card{background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:22px;margin-bottom:17px}
+.step{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:1px solid var(--border);padding:15px 0}
+.step:last-child{border:none}.step>div{flex:1}button,.buttonlink{cursor:pointer;display:inline-block;text-decoration:none;border:1px solid var(--border);border-radius:9px;background:#263651;color:#fff;font-weight:650;font-size:.94rem;padding:12px 15px;min-height:44px}
+button:hover,.buttonlink:hover{filter:brightness(1.13)}button:disabled{opacity:.45;cursor:not-allowed}
+.purple{background:var(--purple);color:#fff}.teal{background:var(--teal);color:#04121a}.danger{background:#63272e;color:#fff;border-color:#e66c79}
+input{background:#0a1220;border:1px solid #697b94;color:white;border-radius:8px;min-height:44px;padding:10px;width:100%;max-width:580px;font:inherit}
+label{display:block;margin:10px 0 5px}.group{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
+.checklabel{display:flex;align-items:flex-start;gap:10px}.checklabel input{min-height:0;width:auto;max-width:none;margin-top:5px}
+.state{font-weight:700;color:var(--teal)}.warn{color:#ffc88e}.error{color:var(--red)}
+.notice{border-left:3px solid var(--teal);padding:8px 12px;background:#0d1a28;margin:15px 0;white-space:pre-wrap}
+.hidden{display:none!important}code{overflow-wrap:anywhere;font-size:.85rem;color:#cff7fa}
+@media(max-width:620px){.step{display:block}.step button{width:100%;margin-top:8px}.card{padding:16px}}
+</style></head>
+<body><header><div class="wrap">
+<img src="road1st-logo.svg" alt="ROAD 1ST">
+<div><h1>ROAD 1ST</h1><div class="muted">Fleet Handover &amp; Close Account · Secure access</div></div>
+</div></header>
+<main class="wrap">
+<p><a class="buttonlink" href="owner.html">Owner Portal</a> <a class="buttonlink" href="index.html?mode=fleet">Fleet Portal</a></p>
+<section class="card" id="intro">
+<h2 id="fleetHeading">Fleet handover</h2>
+<p class="muted" id="roleText">Checking authorised ROAD 1ST session…</p>
+<p class="small">A customer must download their records and personally acknowledge receipt before ROAD 1ST can delete anything. The legal retention checks and owner approval are separate protections.</p>
+<p id="currentState" class="state">Checking status…</p><div id="message" class="notice" role="status" aria-live="polite"></div>
+<div class="group"><button id="refresh" type="button">Refresh handover</button></div>
+</section>
+<section class="card hidden" id="ownerPreparation">
+<h2>1. Prepare customer handover · ROAD 1ST owner only</h2>
+<p class="muted">Exports fleet-scoped journey reports, fuel receipts, defect photographs, driver/vehicle lists, work events and configured fleet settings to an encrypted-access private Storage package. Individual file and package SHA-256 checksums are included. It does not include stored security-token hashes.</p>
+<p class="small">If records exceed the package safety limit, the operation stops rather than silently omit records. The original records remain untouched.</p>
+<button class="teal" type="button" id="prepare">Prepare full handover package</button>
+</section>
+<section class="card hidden" id="packagePanel">
+<h2>2. Download and verify the records</h2>
+<p>Package SHA-256 checksum:</p><p><code id="packageHash">—</code></p>
+<p class="muted" id="packageDetails"></p>
+<div class="group"><button class="teal" type="button" id="download">Download complete ZIP package</button></div>
+<p id="hashResult" class="notice">Your browser checks the downloaded file against the server's SHA-256 checksum.</p>
+</section>
+<section class="card hidden" id="ackPanel">
+<h2>3. Customer confirmation · Fleet manager only</h2>
+<p>The authorised fleet manager must confirm they have saved, inspected and can open their copy. The ROAD 1ST platform owner cannot sign this step for the customer.</p>
+<label for="ackName">Full name of authorised receiving person</label><input type="text" id="ackName" maxlength="160">
+<label class="checklabel"><input id="ackCheck" type="checkbox">I confirm that I have downloaded, checked and securely stored the complete handover ZIP and its checksum.</label>
+<button type="button" id="ack" class="purple" disabled>Confirm customer receipt</button>
+</section>
+<section class="card hidden" id="ownerClose">
+<h2>4. Owner approval and verified close</h2>
+<p id="blockerText" class="warn">Checking retention and privacy holds…</p>
+<p class="muted">Closing a customer disables company access and devices, removes the specific fleet's live report files and records and retains only minimal handover/account evidence. ROAD 1ST backup expiry and legal duties are recorded separately.</p>
+<div id="approveBox" class="hidden">
+<label class="checklabel"><input id="retentionCheck" type="checkbox">I have reviewed contractual retention, unresolved disputes and statutory exceptions for this customer.</label>
+<label class="checklabel"><input id="contractCheck" type="checkbox">This customer's ROAD 1ST contract is ending and their authorised manager has acknowledged the export.</label>
+<label for="approvePhrase">Type <strong id="approveExpected"></strong> to freeze access and approve closure</label>
+<input id="approvePhrase" autocomplete="off" spellcheck="false">
+<button type="button" id="approve" class="danger">Approve closure and revoke enrolled devices</button>
+</div>
+<div id="completeBox" class="hidden">
+<p class="warn">Customer company access has been frozen. The next action permanently removes the fleet's original files, database records and handover ZIP from live Storage. It cannot be reversed.</p>
+<label for="completePhrase">Type <strong id="completeExpected"></strong> to perform verified deletion</label>
+<input id="completePhrase" autocomplete="off" spellcheck="false">
+<button type="button" id="complete" class="danger">Permanently delete this fleet's records and close account</button>
+</div>
+</section>
+<section class="card hidden" id="finished">
+<h2>Handover completed</h2>
+<p id="finishedNote"></p><p class="small">The live deletion result is recorded. Backups and any lawful records retained by ROAD 1ST remain subject to their own retention periods.</p>
+</section>
+<footer class="muted small">© ROAD 1ST · Owner-controlled data handover · Terms and conditions apply</footer>
+</main>
+<script>
+(function(){"use strict";
+var BASE="https://ghyeurbeqwjfyzdwcepn.supabase.co",KEY="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo";
+var API=BASE+"/functions/v1/road1st-fleet-handover-api";
+var fleetId=new URLSearchParams(location.search).get("fleet_id")||"",sess=null,h=null,info=null,downloadVerified=false,busy=false;
+var el=function(id){return document.getElementById(id)};
+try{sess=JSON.parse(sessionStorage.getItem("r1a")||"null")}catch(e){}
+function message(s,error){el("message").textContent=s;el("message").classList.toggle("error",!!error)}
+function hidden(id,hide){el(id).classList.toggle("hidden",!!hide)}
+function date(s){return s?new Date(s).toLocaleString():"—"}
+async function refreshToken(){
+ if(!sess||!sess.refresh_token)throw Error("Please sign in through your Owner or Fleet Portal first.");
+ var res=await fetch(BASE+"/auth/v1/token?grant_type=refresh_token",
+  {method:"POST",headers:{apikey:KEY,"Content-Type":"application/json"},
+   body:JSON.stringify({refresh_token:sess.refresh_token})});
+ var data=await res.json();if(!res.ok)throw Error("Session expired. Sign in through your portal again.");
+ sess={access_token:data.access_token,refresh_token:data.refresh_token||sess.refresh_token,
+  expires_at:Date.now()+(data.expires_in||3600)*1000-30000};
+ sessionStorage.setItem("r1a",JSON.stringify(sess));
+}
+async function request(action,body,binary){
+ if(!sess)throw Error("Please sign in using your Owner or Fleet Portal, then reopen Handover.");
+ if(!sess.expires_at||sess.expires_at<Date.now())await refreshToken();
+ var method=(action==="status"||action==="download")?"GET":"POST";
+ var url=API;
+ var options={method:method,headers:{apikey:KEY,Authorization:"Bearer "+sess.access_token}};
+ if(method==="GET")url+="?action="+action+"&fleet_id="+encodeURIComponent(fleetId);
+ else {options.headers["Content-Type"]="application/json";
+   options.body=JSON.stringify(Object.assign({action:action,fleet_id:fleetId},body||{}))}
+ var res=await fetch(url,options);
+ if(res.status===401){await refreshToken();options.headers.Authorization="Bearer "+sess.access_token;res=await fetch(url,options)}
+ if(!res.ok){var e={};try{e=await res.json()}catch(e2){}
+   throw Error(e.error||"Server returned "+res.status)}
+ return binary?res.arrayBuffer():res.json();
+}
+async function refresh(){
+ if(!fleetId||!/^[a-f0-9-]{36}$/i.test(fleetId)){message("Open this page from an individual company in the Owner Portal or Fleet Portal.",true);return}
+ var response=await request("status");info=response;h=response.handover;
+ el("fleetHeading").textContent="Fleet handover · "+response.fleet.name;
+ el("roleText").textContent=(response.is_owner?"ROAD 1ST owner":response.is_fleet_manager?"Authorised fleet manager":"Read only")+
+   " · Fleet status: "+response.fleet.status;
+ el("currentState").textContent="Handover status: "+(h?h.state.toUpperCase():"NOT STARTED");
+ hidden("ownerPreparation",!(response.is_owner&&!h&&response.fleet.status!=="closed"));
+ hidden("packagePanel",!(h&&["prepared","exported","acknowledged","deletion_requested"].includes(h.state)));
+ hidden("ackPanel",!(h&&h.state==="exported"&&response.is_fleet_manager&&!response.is_owner));
+ hidden("ownerClose",!(response.is_owner&&h&&["acknowledged","deletion_requested"].includes(h.state)));
+ hidden("finished",!(h&&h.state==="completed"));
+ if(h){
+  el("packageHash").textContent=h.package_sha256||"Not prepared";
+  el("packageDetails").textContent="Prepared: "+date(h.prepared_at)+" · Package: "+
+     Number(h.package_size_bytes||0).toLocaleString()+" bytes · Customer receipt: "+date(h.acknowledged_at);
+ }
+ if(h&&h.state==="completed")el("finishedNote").textContent="Live customer records deleted and account closed on "+
+   date(h.completed_at)+". "+(h.backup_retention_note||"");
+ if(response.is_owner&&h){
+   var blockers=response.blockers||{};
+   el("blockerText").textContent="Current blockers: "+
+     (blockers.active_holds||0)+" legal holds, "+
+     (blockers.open_privacy_requests||0)+" open privacy requests, "+
+     (blockers.unapproved_retention_categories||0)+" unapproved retention categories.";
+   hidden("approveBox",h.state!=="acknowledged");
+   hidden("completeBox",h.state!=="deletion_requested");
+   el("approveExpected").textContent="CLOSE "+response.fleet.name;
+   el("completeExpected").textContent="DELETE "+response.fleet.name;
+ }
+ message(h?"Current recorded handover stage: "+h.state+". No data is deleted until owner-approved final closure.":"No handover package prepared. All company data remains unchanged.");
+}
+async function run(buttonId,task){
+ if(busy)return;
+ busy=true;var b=el(buttonId);b.disabled=true;
+ try{await task()}catch(e){message("Operation not completed: "+e.message,true)}
+ finally{busy=false;b.disabled=false}
+}
+el("refresh").onclick=function(){run("refresh",refresh)};
+el("prepare").onclick=function(){run("prepare",async function(){
+ message("Preparing full export and verifying each original file…");
+ var r=await request("prepare");
+ message("Private export prepared: "+r.files+" ZIP entries. The customer can download it.");
+ await refresh();
+})};
+el("download").onclick=function(){run("download",async function(){
+ message("Fetching encrypted-access fleet handover…");
+ var buffer=await request("download",null,true);
+ var digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",buffer)))
+  .map(function(b){return b.toString(16).padStart(2,"0")}).join("");
+ if(!h||digest!==h.package_sha256)throw Error("Checksum mismatch: download rejected.");
+ downloadVerified=true;
+ var blob=new Blob([buffer],{type:"application/zip"}),url=URL.createObjectURL(blob);
+ var a=document.createElement("a");a.href=url;a.download="ROAD1ST-HANDOVER-"+fleetId+".zip";
+ document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},30000);
+ el("hashResult").textContent="PASS: SHA-256 checksum verified. Save and inspect the ZIP, then confirm receipt.";
+ await refresh();
+})};
+el("ackCheck").onchange=function(){el("ack").disabled=!(downloadVerified&&el("ackCheck").checked&&el("ackName").value.trim().length>=2)};
+el("ackName").oninput=function(){el("ackCheck").onchange()};
+el("ack").onclick=function(){run("ack",async function(){
+ if(!downloadVerified||!el("ackCheck").checked)throw Error("Download and check the package first.");
+ await request("acknowledge",{name:el("ackName").value.trim(),confirmed:true,package_sha256:h.package_sha256});
+ await refresh();
+})};
+el("approve").onclick=function(){run("approve",async function(){
+ if(el("approvePhrase").value!==el("approveExpected").textContent||
+   !el("retentionCheck").checked||!el("contractCheck").checked)
+   throw Error("Exact company phrase and both legal confirmations required.");
+ message("Checking retention, holds and package inventory; revoking access if all checks pass…");
+ await request("approve_close",{confirmation:el("approvePhrase").value,
+  retention_reviewed:true,customer_contract_ended:true});
+ await refresh();
+})};
+el("complete").onclick=function(){run("complete",async function(){
+ if(el("completePhrase").value!==el("completeExpected").textContent)
+   throw Error("Exact company deletion phrase required.");
+ message("Checking holds, removing only this company's Storage files and records…");
+ var answer=await request("complete_close",{confirmation:el("completePhrase").value});
+ if(answer.status!=="completed")throw Error("Deletion was not verified.");
+ await refresh();
+})};
+refresh().catch(function(e){message("Handover unavailable: "+e.message,true)});
+})();
+</script></body></html>

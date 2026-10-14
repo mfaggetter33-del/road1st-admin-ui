@@ -88,7 +88,7 @@ function publicHandover(h:Row|null,forOwner:boolean){
  completed_at:h.completed_at,package_sha256:h.package_sha256,
  package_size_bytes:h.package_size_bytes,record_inventory:h.record_inventory,
  acknowledged_name:h.acknowledged_name,legal_hold:h.legal_hold,
- backup_retention_note:h.backup_retention_note};
+ backup_retention_note:h.backup_retention_note,final_inventory:h.final_inventory};
  if(forOwner)obj.last_error=h.last_error;
  return obj;
 }

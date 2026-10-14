@@ -1507,7 +1507,10 @@ function isProtectedFleetPackage(pkg){
   return ["com.mick.driversafety","com.road1st","com.road1st.app",
     "com.android.dialer","com.google.android.dialer","com.samsung.android.dialer",
     "com.android.emergency","com.google.android.emergency",
-    "com.samsung.android.emergency"].indexOf(String(pkg).toLowerCase())>=0;
+    "com.samsung.android.emergency", "com.android.phone", "com.android.server.telecom",
+    "com.android.incallui", "com.samsung.android.incallui",
+    "com.android.systemui", "com.android.launcher3",
+    "com.google.android.apps.nexuslauncher", "com.sec.android.app.launcher"].indexOf(String(pkg).toLowerCase())>=0;
 }
 async function loadFleetPolicyCatalog(){
   if(fleetPolicyCatalog)return fleetPolicyCatalog;

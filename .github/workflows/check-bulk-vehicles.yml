@@ -1,0 +1,19 @@
+name: ROAD 1ST bulk vehicles QA
+on:
+  push:
+    branches:
+      - feature/bulk-fleet-regs-walkaround-link-20261015
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bulk register and vehicle walkaround lookup
+        run: |
+          node checks/check_bulk_vehicle_walkarounds.cjs
+          node checks/check_dashboard_navigation.cjs
+          node check-portal-locales.cjs
+          node checks/check_handover_workflow.cjs

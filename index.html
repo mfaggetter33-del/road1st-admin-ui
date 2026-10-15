@@ -96,7 +96,7 @@ label{
   text-transform:uppercase;
   margin:17px 0 7px;
 }
-input{
+input,textarea{
   width:100%;
   padding:14px 15px;
   background:#0d131c;
@@ -106,7 +106,7 @@ input{
   font-size:15px;
   outline:none;
 }
-input:focus{
+input:focus,textarea:focus{
   border-color:var(--teal);
   box-shadow:0 0 0 3px rgba(45,212,191,.12);
 }
@@ -622,7 +622,7 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 </div>
 <div class="reviewlist" id="fleetVehicleRegister">
   <strong>Fleet vehicles</strong>
-  <div class="note">Add the registrations used by this fleet, including trucks, vans, cars and buses. This does not assign old reports to a vehicle.</div>
+  <div class="note">Add fleet registrations here. Past and future walkarounds appear under the matching registration within this fleet. Every inspection remains a separate dated report.</div>
   <div class="fleetgrid">
     <div><label for="newVehicleRegistration">Registration</label><input id="newVehicleRegistration" maxlength="32" placeholder="131D11111"></div>
     <div><label for="newVehicleType">Vehicle type</label><select id="newVehicleType"><option value="Truck">Truck</option><option value="Van + Tacho">Van + Tacho</option><option value="Car / Van">Car / Van</option><option value="Bus">Bus</option></select></div>
@@ -630,6 +630,20 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
     <div style="align-self:end"><button id="addFleetVehicle" class="secondary full" type="button">Add vehicle</button></div>
     <div><button id="cancelVehicleEdit" class="secondary full hidden" type="button">Cancel edit</button></div>
   </div>
+  <details id="bulkFleetVehicleBox" class="reviewlist">
+    <summary style="cursor:pointer;font-weight:700">Bulk add vehicles · paste registrations</summary>
+    <div class="note">Paste one registration per line, or copy a spreadsheet column. Commas, semicolons and tabs also work. Choose a vehicle type for this batch; you can add another type in a second batch. Existing registrations will be skipped.</div>
+    <div class="fleetgrid">
+      <div><label for="bulkVehicleType">Vehicle type for this batch</label><select id="bulkVehicleType"><option value="Truck">Truck</option><option value="Van + Tacho">Van + Tacho</option><option value="Car / Van">Car / Van</option><option value="Bus">Bus</option></select></div>
+    </div>
+    <label for="bulkVehicleRegistrations">Paste registrations (maximum 200 per batch)</label>
+    <textarea id="bulkVehicleRegistrations" rows="6" spellcheck="false" placeholder="241D12345&#10;252KY1234&#10;AB12 CDE"></textarea>
+    <div class="compliance-actions">
+      <button id="bulkVehiclePreview" class="secondary" type="button">Preview registrations</button>
+      <button id="bulkVehicleAdd" class="teal" type="button">Add valid vehicles</button>
+    </div>
+    <div id="bulkVehicleFeedback" class="note" role="status" aria-live="polite"></div>
+  </details>
   <label for="fleetVehicleFind">Find a fleet vehicle</label>
   <input id="fleetVehicleFind" placeholder="Search registration or unit number">
   <div id="fleetVehicleList" class="note">No vehicles registered.</div>
@@ -1733,7 +1747,11 @@ function renderFleetVehicles(){
     var remove=document.createElement("button");remove.type="button";remove.className="secondary";
     remove.textContent=reportT("Remove");
     remove.onclick=function(){removeFleetVehicle(v.id,v.registration)};
-    actions.appendChild(edit);actions.appendChild(remove);
+    var walkarounds=document.createElement("button");walkarounds.type="button";walkarounds.className="secondary";
+    walkarounds.textContent=reportT("Walkaround checks");
+    walkarounds.setAttribute("aria-label",reportT("Walkaround checks")+": "+v.registration);
+    walkarounds.onclick=function(){openFleetVehicleWalkarounds(v).catch(function(e){status.textContent=e.message||"Could not open walkaround records."})};
+    actions.appendChild(walkarounds);actions.appendChild(edit);actions.appendChild(remove);
     row.appendChild(name);row.appendChild(actions);panel.appendChild(row);
   });
   if(rows.length>100){var hint=document.createElement("div");hint.className="note";
@@ -1763,6 +1781,104 @@ async function addFleetVehicle(){
     status.textContent=editing?reportT("Fleet vehicle updated."):reportT("Fleet vehicle added.");
   }catch(e){status.textContent=e.message||"Could not save vehicle."}
   finally{button.disabled=false}
+}
+// Bulk registration intake is deliberately a client-side wrapper around the
+// existing authorised, fleet-scoped add_vehicle API. No report is changed.
+var bulkVehicleBusy=false;
+function normaliseFleetRegistration(reg){
+  return String(reg||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+}
+function parseBulkFleetRegistrations(raw){
+  var rows=String(raw||"").split(/[\r\n\t,;]+/),
+      entries=[],invalid=[],repeated=[],seen=new Set();
+  rows.forEach(function(value){
+    var reg=value.trim().toUpperCase().replace(/\s+/g," ");
+    if(!reg||reg==="REGISTRATION"||reg==="REG")return;
+    var key=normaliseFleetRegistration(reg);
+    if(!/^[A-Z0-9 -]{2,32}$/.test(reg)||key.length<2){
+      invalid.push(reg.slice(0,40));return;
+    }
+    if(seen.has(key)){repeated.push(reg);return}
+    seen.add(key);entries.push({registration:reg,key:key});
+  });
+  return {entries:entries,invalid:invalid,repeated:repeated};
+}
+function bulkFleetVehiclePreview(){
+  var fleetId=document.getElementById("fleetSelect").value;
+  if(!fleetData||!fleetData.fleet||fleetData.fleet.id!==fleetId)
+    throw Error("Select and load the correct fleet first.");
+  var parsed=parseBulkFleetRegistrations(document.getElementById("bulkVehicleRegistrations").value);
+  if(parsed.entries.length>200)throw Error("Maximum 200 unique registrations per batch.");
+  var existing=new Set((fleetData.vehicles||[]).filter(function(v){return v.active})
+    .map(function(v){return normaliseFleetRegistration(v.registration)}));
+  var added=parsed.entries.filter(function(x){return !existing.has(x.key)});
+  var skipped=parsed.entries.length-added.length;
+  return {fleetId:fleetId,parsed:parsed,added:added,skipped:skipped};
+}
+function previewBulkFleetVehicles(){
+  var feedback=document.getElementById("bulkVehicleFeedback");
+  try{
+    var plan=bulkFleetVehiclePreview();
+    feedback.textContent=plan.added.length+" new vehicles to add · "+
+      plan.skipped+" already registered · "+
+      plan.parsed.repeated.length+" repeated in paste · "+
+      plan.parsed.invalid.length+" invalid. "+
+      (plan.parsed.invalid.length?"Check: "+plan.parsed.invalid.slice(0,5).join(", "):"");
+  }catch(e){feedback.textContent=e.message||"Could not preview registrations."}
+}
+async function bulkAddFleetVehicles(){
+  if(bulkVehicleBusy)return;
+  var feedback=document.getElementById("bulkVehicleFeedback"),button=document.getElementById("bulkVehicleAdd"),
+      preview=document.getElementById("bulkVehiclePreview"),fleetSelect=document.getElementById("fleetSelect");
+  var plan;
+  try{plan=bulkFleetVehiclePreview()}
+  catch(e){feedback.textContent=e.message||"Invalid registration list.";return}
+  if(plan.parsed.invalid.length){
+    feedback.textContent="Correct the invalid registrations first: "+
+      plan.parsed.invalid.slice(0,5).join(", ");return;
+  }
+  if(!plan.added.length){
+    feedback.textContent="No new registrations to add. Existing vehicles and reports are unchanged.";return;
+  }
+  if(fleetData.role==="viewer"){
+    feedback.textContent="Fleet manager access is required to add vehicles.";return;
+  }
+  var type=document.getElementById("bulkVehicleType").value,
+      company=fleetData.fleet.name,added=0,skipped=plan.skipped,failed=[];
+  if(!["Truck","Van + Tacho","Car / Van","Bus"].includes(type))return;
+  if(!await confirmRoad1st("Add vehicles",company,
+      "Add "+plan.added.length+" "+type+" registrations to this fleet? Existing registrations and historical records will be left untouched.",
+      "Add vehicles"))return;
+  bulkVehicleBusy=true;button.disabled=true;preview.disabled=true;fleetSelect.disabled=true;
+  try{
+    for(var item of plan.added){
+      try{
+        var result=await api(F,{method:"POST",body:JSON.stringify({
+          action:"add_vehicle",fleet_id:plan.fleetId,
+          registration:item.registration,vehicle_type:type,unit_number:""
+        })});
+        if(!result||!result.vehicle||normaliseFleetRegistration(result.vehicle.registration)!==item.key)
+          throw Error("Server did not confirm the registration.");
+        added++;
+      }catch(e){
+        if(e&&/vehicle_already_registered|registration_already_used/.test(String(e.message||"")))
+          skipped++;
+        else failed.push(item.registration);
+      }
+      feedback.textContent="Bulk entry: "+added+" added · "+skipped+
+        " skipped · "+failed.length+" failed.";
+    }
+    if(fleetSelect.value===plan.fleetId)await loadFleet(plan.fleetId);
+    feedback.textContent="Bulk entry complete for "+company+": "+added+" added · "+
+      skipped+" existing skipped · "+failed.length+" failed."+
+      (failed.length?" Review: "+failed.slice(0,12).join(", "):"")+
+      " All existing walkaround reports were retained.";
+  }catch(e){
+    feedback.textContent="Entry stopped: "+added+" added before the error. "+
+      (e.message||"Refresh the fleet and check remaining registrations.");
+  }finally{
+    bulkVehicleBusy=false;button.disabled=false;preview.disabled=false;fleetSelect.disabled=false;
+  }
 }
 // ROAD 1ST confirmation box. Cancel, Escape and clicking outside are always safe.
 var road1stConfirmBusy=false;
@@ -1826,6 +1942,30 @@ async function removeFleetVehicle(id,registration){
     await loadFleet(fleetId);
     status.textContent=reportT("Vehicle removed. Existing records were not deleted.");
   }catch(e){status.textContent=e.message||"Could not remove vehicle."}
+}
+// Open the selected vehicle's inspection history, scoped to this fleet ID.
+// Registration matching is a filtered VIEW, not an update to report records.
+async function openFleetVehicleWalkarounds(vehicle){
+  var fleetId=document.getElementById("fleetSelect").value;
+  if(!fleetData||!fleetData.fleet||fleetData.fleet.id!==fleetId||
+     !(fleetData.vehicles||[]).some(function(v){
+       return v.id===vehicle.id&&normaliseFleetRegistration(v.registration)===
+         normaliseFleetRegistration(vehicle.registration);
+     }))throw Error("The vehicle does not belong to the selected fleet.");
+  ++navigationSequence;
+  C="reports";
+  hideDashboardViews();
+  document.getElementById("title").textContent=reportT("Walkaround checks")+" · "+vehicle.registration;
+  document.getElementById("fleetRecordsTitle").textContent=reportT("Walkaround checks")+" · "+vehicle.registration;
+  document.getElementById("fleetRecordsPanel").classList.remove("hidden");
+  fillFleetRecordsFleets();
+  document.getElementById("fleetRecordsFleet").value=fleetId;
+  document.getElementById("fleetRecordReg").value=vehicle.registration;
+  document.getElementById("fleetRecordCategory").value="Walkaround";
+  document.getElementById("fleetRecordFrom").value="";
+  document.getElementById("fleetRecordTo").value="";
+  document.getElementById("fleetRecordGroup").value="day";
+  await searchFleetRecords();
 }
 var fleetRecordItems=[],fleetRecordsSearchSequence=0;
 function fillFleetRecordsFleets(){
@@ -2229,6 +2369,8 @@ document.getElementById("saveCustomAppRules").onclick=saveFleetCustomApps;
 document.getElementById("addFleetFuelCard").onclick=addFleetFuelCard;
 document.getElementById("fleetFuelCardProvider").onchange=fuelCardProviderSelectionChanged;
 document.getElementById("addFleetVehicle").onclick=addFleetVehicle;
+document.getElementById("bulkVehiclePreview").onclick=previewBulkFleetVehicles;
+document.getElementById("bulkVehicleAdd").onclick=bulkAddFleetVehicles;
 document.getElementById("cancelVehicleEdit").onclick=resetVehicleEdit;
 document.getElementById("fleetVehicleFind").oninput=renderFleetVehicles;
 document.getElementById("fleetRecordSearch").onclick=searchFleetRecords;

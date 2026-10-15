@@ -31,6 +31,7 @@ jobs:
           node --check portal-explanations.js
           node --check portal-i18n.js
           node check-portal-locales.cjs
+          node checks/check_bulk_vehicle_walkarounds.cjs
           node checks/check_dashboard_navigation.cjs
           node checks/check_handover_workflow.cjs
 

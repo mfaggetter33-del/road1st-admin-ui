@@ -8,7 +8,7 @@
 - **Important:** this is **interface separation, not device-enforced access control**. An owner who knows the full Owner Portal URL and has valid owner credentials could still access owner operations from any supported browser. True laptop-only authorization would require separate trusted-device policy and server-side enforcement, not hiding buttons by screen size.
 
 ## Account password policy — staged UI, backend required
-- Intended new account password: **12+ characters**, with at least one ASCII letter, at least one digit and at least one recognised symbol. Spaces may exist in a long passphrase but do not count as the required symbol.
+- Intended new account password: **8+ characters**, with at least one ASCII letter, at least one digit and at least one recognised symbol. Spaces may exist in a long passphrase but do not count as the required symbol.
 - Shared `password-policy.js` validator is used for **new Fleet Portal account registration**. It does NOT reject existing-account sign-in and does not change the 5-digit local driver PIN.
 - The current production web signup still allows 8 characters until this preview branch is reviewed/merged.
 - **This client-side check is not an enforceable security boundary.** Users could call Supabase Auth signup or reset directly. Before rollout, configure the Supabase project Auth password **minimum length 12** and appropriate **required character classes**, verify exact supported combination and match every create/reset UI to the server response.

@@ -4,12 +4,12 @@
 (function(root){"use strict";
   var symbols = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./" + String.fromCharCode(96) + "~";
   function valid(password){
-    return typeof password==="string" && password.length>=12 &&
+    return typeof password==="string" && password.length>=8 &&
       /[A-Za-z]/.test(password) && /[0-9]/.test(password) &&
       Array.from(password).some(function(ch){return symbols.indexOf(ch)!==-1});
   }
   root.ROAD1ST_PASSWORD_POLICY=Object.freeze({
-    minLength:12,valid:valid,
-    description:"At least 12 characters, including a letter, a number and a symbol."
+    minLength:8,valid:valid,
+    description:"At least 8 characters, including a letter, a number and a symbol."
   });
 })(typeof window==="undefined"?globalThis:window);

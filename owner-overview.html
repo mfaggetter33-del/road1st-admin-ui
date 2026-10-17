@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROAD 1ST | Owner Overview</title>
+<meta name="theme-color" content="#0a0e14">
+<meta name="robots" content="noindex,nofollow">
+<style>
+:root{color-scheme:dark;--bg:#0a0e14;--panel:#131b27;--line:#344054;--ink:#f4f7fc;--muted:#afb9ca;--teal:#2dd4bf;--purple:#a27aff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Roboto,Arial,sans-serif}
+main{max-width:660px;margin:auto;padding:18px 15px 42px}.head{display:flex;align-items:center;gap:12px;margin:4px 0 18px}.head img{width:56px;height:56px;object-fit:contain}.brand{font-size:22px;font-weight:850;letter-spacing:.04em}.eyebrow{font-size:11px;color:var(--teal);font-weight:800;letter-spacing:.09em}
+.sub{color:var(--muted);font-size:14px}.panel,.fleet{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:17px;margin:14px 0}.panel h1{font-size:22px;margin:0 0 5px}.panel h2,.fleet h2{font-size:18px;margin:0 0 8px}
+label{display:block;margin:12px 0 5px;font-weight:650}input{width:100%;background:#080d16;border:1px solid #60718b;color:var(--ink);padding:13px;border-radius:10px;font:inherit}
+button{border:1px solid #8561e5;background:#6541c2;color:#fff;font:inherit;font-weight:760;padding:12px 16px;border-radius:11px;cursor:pointer;min-height:45px}button:disabled{opacity:.5;cursor:wait}
+button.secondary{background:#202b3e;border-color:#4b6380}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.metric{border:1px solid #354057;background:#0a121f;border-radius:12px;padding:11px 8px;text-align:center}.metric strong{display:block;color:var(--teal);font-size:25px;line-height:1.3;font-variant-numeric:tabular-nums}.metric span{font-size:11px;color:var(--muted)}
+.fleet-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.fleet h2{overflow-wrap:anywhere}.state{color:var(--teal);font-weight:700;font-size:12px}.state.other{color:#facf91}
+.notice{font-size:13px;color:var(--muted);margin:10px 0 0;min-height:22px;white-space:pre-line}.hidden{display:none!important}.only{color:var(--teal);font-weight:750}.footer{border-top:1px solid var(--line);color:var(--muted);font-size:12px;text-align:center;margin-top:24px;padding-top:15px}
+@media(max-width:380px){main{padding:13px 10px}.metric strong{font-size:20px}.panel,.fleet{padding:13px}}
+</style>
+</head>
+<body>
+<main>
+  <header class="head"><img src="road1st-logo.svg" alt="ROAD 1ST logo"><div><div class="brand">ROAD 1ST</div><div class="eyebrow">OWNER · PHONE OVERVIEW</div></div></header>
+  <section class="panel">
+    <h1>Read-only overview</h1>
+    <p class="sub">Check your test fleets and report totals from your phone. Full Owner and Fleet management remains on your laptop. This page cannot publish APKs, edit fleets or delete records.</p>
+  </section>
+  <section id="login" class="panel">
+    <h2>Owner sign in</h2>
+    <form id="loginForm">
+      <label for="email">Owner email</label><input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+      <div class="actions"><button id="signIn" type="submit">View overview</button></div>
+    </form>
+    <p id="loginError" class="notice" role="status"></p>
+  </section>
+  <section id="dashboard" class="hidden" aria-label="Fleet overview">
+    <section class="panel">
+      <div class="eyebrow">YOUR TEST ACCOUNTS</div><h2>Fleet summary</h2>
+      <p id="updated" class="sub">Not refreshed yet.</p>
+      <div class="metrics">
+        <div class="metric"><strong id="fleetCount">—</strong><span>Fleet accounts</span></div>
+        <div class="metric"><strong id="reportCount">—</strong><span>Reports</span></div>
+        <div class="metric"><strong id="defectCount">—</strong><span>Defect photos</span></div>
+      </div>
+      <div class="actions"><button id="refresh" type="button" class="secondary">Refresh overview</button><button id="logout" type="button" class="secondary">Sign out</button></div>
+      <p id="status" class="notice" role="status"></p>
+    </section>
+    <div id="fleets" aria-live="polite"></div>
+  </section>
+  <div class="footer">Owner information only · No editing controls on this page · ROAD 1ST</div>
+</main>
+<script>
+(function(){"use strict";
+var P="https://ghyeurbeqwjfyzdwcepn.supabase.co",
+    K="sb_publishable_vSYJEsmqvOyJMUYdeKtw8w_TblHTABo",
+    F=P+"/functions/v1/road1st-fleet-admin-api",
+    A=P+"/functions/v1/road1st-admin-api",S=null,
+    key="road1st_owner_phone_overview_session_v1";
+function $(id){return document.getElementById(id)}
+function visible(isSignedIn){$("login").classList.toggle("hidden",isSignedIn);$("dashboard").classList.toggle("hidden",!isSignedIn)}
+function save(s){S=s;sessionStorage.setItem(key,JSON.stringify(s))}
+function clear(){S=null;sessionStorage.removeItem(key)}
+try{S=JSON.parse(sessionStorage.getItem(key)||"null")}catch(e){clear()}
+async function refreshToken(){
+ if(!S||!S.refresh_token)throw Error("Sign in to view the overview.");
+ var r=await fetch(P+"/auth/v1/token?grant_type=refresh_token",{
+  method:"POST",headers:{apikey:K,"Content-Type":"application/json"},
+  body:JSON.stringify({refresh_token:S.refresh_token})
+ });
+ var d=await r.json();if(!r.ok)throw Error("Your session expired. Please sign in again.");
+ save({access_token:d.access_token,refresh_token:d.refresh_token||S.refresh_token,
+       expires_at:Date.now()+(d.expires_in||3600)*1000-30000});
+}
+async function read(url){
+ if(!S)throw Error("Sign in required.");
+ if(!S.expires_at||Date.now()>S.expires_at)await refreshToken();
+ async function get(){return fetch(url,{method:"GET",headers:{apikey:K,Authorization:"Bearer "+S.access_token}})}
+ var r=await get();
+ if(r.status===401){await refreshToken();r=await get()}
+ var d={};try{d=await r.json()}catch(e){}
+ if(!r.ok)throw Error(r.status===403?"Owner account required.":(d.error||"Overview temporarily unavailable."));
+ return d;
+}
+function metric(id,value){$(id).textContent=String(value)}
+function fleetCard(f,counts){
+ var card=document.createElement("section");card.className="fleet";
+ var top=document.createElement("div");top.className="fleet-header";
+ var title=document.createElement("h2");title.textContent=f.name||"Fleet";
+ var state=document.createElement("span");state.className="state"+(f.status==="active"?"":" other");
+ state.textContent=f.status||"Unknown";
+ top.append(title,state);card.appendChild(top);
+ var line=document.createElement("div");line.className="metrics";
+ [["Reports",counts.reports],["Fuel receipts",counts.fuel],["Defect photos",counts.defects]].forEach(function(pair){
+   var block=document.createElement("div");block.className="metric";
+   var n=document.createElement("strong");n.textContent=String(pair[1]??"—");
+   var label=document.createElement("span");label.textContent=pair[0];
+   block.append(n,label);line.appendChild(block);
+ });
+ card.appendChild(line);return card;
+}
+async function load(){
+ $("status").textContent="Checking live fleet summaries...";
+ var profile=await read(A+"?kind=compliance");
+ if(profile.role!=="owner")throw Error("This screen is for the ROAD 1ST Owner account only.");
+ var first=await read(F);
+ var fleets=Array.isArray(first.fleets)?first.fleets:[];
+ var results=await Promise.all(fleets.map(function(f){
+  return read(F+"?kind=summary&fleet_id="+encodeURIComponent(f.id)).then(function(d){return {fleet:f,counts:d}})
+    .catch(function(){return {fleet:f,counts:{reports:"—",fuel:"—",defects:"—"}}});
+ }));
+ $("fleets").textContent="";
+ results.forEach(function(x){$("fleets").appendChild(fleetCard(x.fleet,x.counts))});
+ metric("fleetCount",fleets.length);
+ metric("reportCount",results.every(function(x){return Number.isFinite(Number(x.counts.reports))})?
+     results.reduce(function(a,x){return a+Number(x.counts.reports)},0):"—");
+ metric("defectCount",results.every(function(x){return Number.isFinite(Number(x.counts.defects))})?
+     results.reduce(function(a,x){return a+Number(x.counts.defects)},0):"—");
+ $("updated").textContent="Last checked: "+new Date().toLocaleString();
+ $("status").textContent="Read-only · Management remains on your laptop.";
+ visible(true);
+}
+$("loginForm").addEventListener("submit",async function(e){
+ e.preventDefault();var button=$("signIn");button.disabled=true;$("loginError").textContent="";
+ try{
+  var r=await fetch(P+"/auth/v1/token?grant_type=password",{
+   method:"POST",headers:{apikey:K,"Content-Type":"application/json"},
+   body:JSON.stringify({email:$("email").value.trim(),password:$("password").value})
+  });
+  var d=await r.json();
+  if(!r.ok)throw Error(d.error_description||d.msg||"Sign in failed.");
+  save({access_token:d.access_token,refresh_token:d.refresh_token,
+        expires_at:Date.now()+(d.expires_in||3600)*1000-30000});
+  $("password").value="";await load();
+ }catch(e){clear();visible(false);$("loginError").textContent=e.message||"Sign in failed."}
+ finally{button.disabled=false}
+});
+$("refresh").onclick=function(){load().catch(function(e){$("status").textContent=e.message})};
+$("logout").onclick=function(){clear();visible(false);$("fleets").textContent="";$("password").value=""};
+if(S)load().catch(function(e){clear();visible(false);$("loginError").textContent=e.message});
+})();
+</script>
+</body>
+</html>

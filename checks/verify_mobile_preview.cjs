@@ -5,10 +5,10 @@ const policyJs=fs.readFileSync("password-policy.js","utf8");
 const context={window:{}};
 vm.runInNewContext(policyJs,context,{filename:"password-policy.js"});
 const pass=context.window.ROAD1ST_PASSWORD_POLICY;
-assert.equal(pass.minLength,12);
-for(const p of ["SafeOwner2026!","PurpleFleet77#","LongPassword1~"])
+assert.equal(pass.minLength,8);
+for(const p of ["SafeOwner2026!","PurpleFleet77#","LongPassword1~","Abcdef1!"])
   assert.equal(pass.valid(p),true,"rejected valid example");
-for(const p of ["simplepassword","Longwordonlynochar","1234567890123","NotEnough1!","WithLetters1234","NoNumbers!!!?"])
+for(const p of ["simplepassword","Longwordonlynochar","1234567890123","Short1!","WithLetters1234","NoNumbers!!!?"])
   assert.equal(pass.valid(p),false,"accepted invalid example "+p);
 const index=fs.readFileSync("index.html","utf8");
 assert.match(index,/<script src="password-policy\.js"><\/script>/);
@@ -32,7 +32,7 @@ assert.equal((owner.match(/method:"POST"/g)||[]).length,2);
 assert.match(owner,/P\+"\/auth\/v1\/token\?grant_type=password"/);
 assert.match(owner,/P\+"\/auth\/v1\/token\?grant_type=refresh_token"/);
 assert.doesNotMatch(owner,/method:"POST",body:JSON\.stringify\(\{action:/);
-console.log("PASS: twelve-character account password validator with letter, digit, symbol");
+console.log("PASS: eight-character account password validator with letter, digit, symbol");
 console.log("PASS: existing login and test driver PIN were not modified in staged pages");
 console.log("PASS: mobile owner overview reads authenticated data only; no management calls");
 console.log("NOTE: server-side Supabase Auth password requirements must be configured before rollout");

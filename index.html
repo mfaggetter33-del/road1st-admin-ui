@@ -391,6 +391,9 @@ select:focus{outline:2px solid var(--teal);outline-offset:1px}
 .qrbox svg{display:block;width:100%;height:auto}
 .device{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 .device button{padding:8px 11px;font-size:12px}
+.device-presence{display:inline-block;width:10px;height:10px;border-radius:50%;background:#858b96;flex:none;vertical-align:middle;margin-right:8px;box-shadow:0 0 0 2px rgba(255,255,255,.06)}
+.device-presence.online{background:#23b36b;box-shadow:0 0 0 2px rgba(35,179,107,.15)}
+.device-presence.linked{background:#a257e9;box-shadow:0 0 0 2px rgba(162,87,233,.2)}
 #fleetFuelCardList .device{display:flex;justify-content:space-between;gap:12px;align-items:center}
 #fleetFuelCardList .device strong{overflow-wrap:anywhere}
 #fleetFuelCardList .device button{flex-shrink:0}
@@ -1350,7 +1353,19 @@ function renderFleet(d){
     var row=document.createElement("div");row.className="device";
     var chosen=selectedFleetDeviceId===x.id;
     if(chosen)row.classList.add("selected-phone");
-    var who=document.createElement("strong");who.textContent=label;
+    var who=document.createElement("strong");
+    var presence=document.createElement("span");presence.className="device-presence";
+    // Only verified, fresh server-side app heartbeats can promote a device from grey.
+    // Enrolment and historical diagnostic uploads are NOT live presence.
+    var live=x.presence||null;
+    var lastHeartbeat=live&&Date.parse(live.last_heartbeat_at||"");
+    var maxAgeMs=live&&Number(live.max_age_ms)||1200000;
+    var fresh=!!(lastHeartbeat&&Date.now()-lastHeartbeat>=0&&Date.now()-lastHeartbeat<=maxAgeMs);
+    var state=fresh&&live.linked===true?"linked":fresh&&live.active===true?"online":"offline";
+    if(state!=="offline")presence.classList.add(state);
+    presence.title=state==="linked"?"ROAD 1ST linked to co-driver":state==="online"?"ROAD 1ST active":"ROAD 1ST not currently reporting";
+    presence.setAttribute("aria-label",presence.title);
+    who.appendChild(presence);who.appendChild(document.createTextNode(label));
     var meta=document.createElement("div");meta.className="sub";
     meta.textContent=(x.device_model||"Phone")+" · "+reportT("Version name")+": "+(x.app_version||"—");
     if(x.revoked_at)meta.textContent+=" · "+reportT("Revoked");

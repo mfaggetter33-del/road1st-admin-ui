@@ -2459,6 +2459,11 @@ document.querySelectorAll(".stat").forEach(function(button){
     if(event.key==="Enter"||event.key===" "){event.preventDefault();button.click()}
   };
 });
+// Fleet presence is refreshed from the server; this never polls the Android phones.
+setInterval(function(){
+  if(document.visibilityState!=="visible"||!S||!fleetData||!fleetData.fleet||!fleetData.fleet.id)return;
+  loadFleet(fleetData.fleet.id).catch(function(){});
+},60000);
 if(S)show();
 })();
 </script>

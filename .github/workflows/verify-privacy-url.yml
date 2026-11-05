@@ -18,14 +18,20 @@ jobs:
         run: |
           set -euo pipefail
           url="https://admin.r1st.ie/privacy.html"
+          deletion_url="https://admin.r1st.ie/delete-account.html"
           for attempt in 1 2 3 4 5 6 7 8; do
             if curl --fail --location --silent --show-error --max-time 15 "$url" -o /tmp/road1st-public-privacy.html && \
                grep -q '<title>Privacy Policy | ROAD 1ST</title>' /tmp/road1st-public-privacy.html && \
                grep -q 'info@r1st.ie' /tmp/road1st-public-privacy.html && \
                grep -q 'Fleet retention policy' /tmp/road1st-public-privacy.html && \
                grep -q 'Private retention' /tmp/road1st-public-privacy.html && \
-               grep -q 'six years' /tmp/road1st-public-privacy.html; then
-              echo "PASS: ROAD 1ST public policy HTML is accessible at $url"
+               grep -q 'six years' /tmp/road1st-public-privacy.html && \
+               grep -q 'href="delete-account.html"' /tmp/road1st-public-privacy.html && \
+               curl --fail --location --silent --show-error --max-time 15 "$deletion_url" -o /tmp/road1st-account-deletion.html && \
+               grep -q '<title>Request Account Deletion | ROAD 1ST</title>' /tmp/road1st-account-deletion.html && \
+               grep -q 'info@r1st.ie' /tmp/road1st-account-deletion.html && \
+               grep -q 'fleet' /tmp/road1st-account-deletion.html; then
+              echo "PASS: ROAD 1ST public policy and account deletion request page are accessible at $url and $deletion_url"
               exit 0
             fi
             sleep 5

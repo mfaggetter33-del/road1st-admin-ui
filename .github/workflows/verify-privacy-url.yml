@@ -1,0 +1,31 @@
+name: Verify ROAD 1ST public privacy policy
+
+on:
+  push:
+    branches: [main]
+    paths: ['privacy.html', '.github/workflows/verify-privacy-url.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm a publicly accessible HTML privacy policy
+        run: |
+          set -euo pipefail
+          url="https://admin.r1st.ie/privacy.html"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if curl --fail --location --silent --show-error --max-time 15 "$url" -o /tmp/road1st-public-privacy.html && \
+               grep -q '<title>Privacy Policy | ROAD 1ST</title>' /tmp/road1st-public-privacy.html && \
+               grep -q 'info@r1st.ie' /tmp/road1st-public-privacy.html; then
+              echo "PASS: ROAD 1ST public policy HTML is accessible at $url"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "FAIL: public policy inaccessible or required content missing"
+          exit 1

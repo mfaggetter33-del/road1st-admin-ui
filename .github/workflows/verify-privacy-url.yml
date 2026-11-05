@@ -21,7 +21,10 @@ jobs:
           for attempt in 1 2 3 4 5 6 7 8; do
             if curl --fail --location --silent --show-error --max-time 15 "$url" -o /tmp/road1st-public-privacy.html && \
                grep -q '<title>Privacy Policy | ROAD 1ST</title>' /tmp/road1st-public-privacy.html && \
-               grep -q 'info@r1st.ie' /tmp/road1st-public-privacy.html; then
+               grep -q 'info@r1st.ie' /tmp/road1st-public-privacy.html && \
+               grep -q 'Fleet retention policy' /tmp/road1st-public-privacy.html && \
+               grep -q 'Private retention' /tmp/road1st-public-privacy.html && \
+               grep -q 'six years' /tmp/road1st-public-privacy.html; then
               echo "PASS: ROAD 1ST public policy HTML is accessible at $url"
               exit 0
             fi
